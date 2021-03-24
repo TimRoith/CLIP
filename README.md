@@ -4,6 +4,9 @@ Feel free to use it and please refer to our paper when doing so.
 ```math
 SE = \frac{\sigma}{\sqrt{n}}
 ```
+Inline $`\sqrt{2}`$
+
+<pre xml:lang="latex">\sqrt{2}</pre>
 
 ## Prerequistes
 Our code is implemented python and utlizes PyTorch https://pytorch.org/ (see also their git https://github.com/pytorch/pytorch). 
