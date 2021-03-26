@@ -1,5 +1,5 @@
 # CLIP
-This repository provides an implementation of the *CLIP* algorithm for Lipschitz regularization of neural networks, proposed in **CLIP: Cheap Lipschitz Training of Neuronal Networks** [1].
+In a few days this repository will provide an implementation of the *CLIP* algorithm for Lipschitz regularization of neural networks, proposed in **CLIP: Cheap Lipschitz Training of Neuronal Networks** [1].
 Feel free to use it and please refer to our paper when doing so.
 
 ## Prerequistes
