@@ -14,8 +14,10 @@ Feel free to use it and please refer to our paper when doing so.
 
 ## Method Description
 The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. For a neural network 
-<img src="https://latex.codecogs.com/svg.latex?f_\theta:\mathcal{X}\rightarrow\mathcal{Y}" title="net"/> parametrized by weights 
-<img src="https://latex.codecogs.com/svg.latex?\theta" title="net"/> the goal is to minimize a loss term of the form
+<p align="center">
+      <img src="https://latex.codecogs.com/svg.latex?f_\theta:\mathcal{X}\rightarrow\mathcal{Y}" title="net"/> 
+</p>
+parametrized by weights <img src="https://latex.codecogs.com/svg.latex?\theta" title="net"/> the goal is to minimize a loss term of the form
 
 <p align="center">
       <img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta}(x),y)+\mathrm{Lip}(f_\theta)" title="Lipschitz Loss" />
