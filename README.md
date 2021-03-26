@@ -1,7 +1,7 @@
 # CLIP
 Implementation of the *CLIP* algorithm for Lipschitz regularization of neural networks, proposed in **CLIP: Cheap Lipschitz Training of Neuronal Networks** [[1]](#1).
 Feel free to use it and please refer to our paper when doing so.
-
+```
 @misc{bungert2021clip,
       title={CLIP: Cheap Lipschitz Training of Neural Networks}, 
       author={Leon Bungert and René Raab and Tim Roith and Leo Schwinn and Daniel Tenbrinck},
@@ -10,9 +10,13 @@ Feel free to use it and please refer to our paper when doing so.
       archivePrefix={arXiv},
       primaryClass={cs.LG}
 }
+```
 
 ## Method Description
-<img src="https://render.githubusercontent.com/render/math?math=e^{i \pi}=-1">
+The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. The goal is to minimize a loss term of the form
+
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta},y)+\mathrm{Lip}(f_\theta)" title="\Large x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}" />
+
 
 
 
