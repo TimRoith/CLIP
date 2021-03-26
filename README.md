@@ -1,7 +1,7 @@
 # CLIP
 In a few days this repository will provide an implementation of the *CLIP* algorithm for Lipschitz regularization of neural networks, proposed in **CLIP: Cheap Lipschitz Training of Neuronal Networks** [1].
 
-![formula](https://render.githubusercontent.com/render/math?math=e^{i \pi} = -1)
+<img src="https://render.githubusercontent.com/render/math?math=e^{i \pi}=-1">
 
 Feel free to use it and please refer to our paper when doing so.
 
