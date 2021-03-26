@@ -13,11 +13,20 @@ Feel free to use it and please refer to our paper when doing so.
 ```
 
 ## Method Description
-The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. The goal is to minimize a loss term of the form
+The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. For a neural network 
+<img src="https://latex.codecogs.com/svg.latex?f_\theta:\mathcal{X}\rightarrow\mathcal{Y}" title="net"/> parametrized by weights 
+<img src="https://latex.codecogs.com/svg.latex?\theta" title="net"/> the goal is to minimize a loss term of the form
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta},y)+\mathrm{Lip}(f_\theta)" title="\Large x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}" />
+<p align="center">
+      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta}(x),y)+\mathrm{Lip}(f_\theta)" title="Lipschitz Loss" />
+</p>
 
-
+where <img src="https://latex.codecogs.com/svg.latex?\mathcal{T}=\{(x_i,y_i)\}_{i=1}^N\subset\mathcal{X}\times\mathcal{Y}" title="training set"/> denotes the training set, 
+<img src="https://latex.codecogs.com/svg.latex?l(\cdot,\cdot)" title="loss"/> a loss function and 
+<p align="center">
+      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathrm{Lip}(f_\theta)=\sup_{x,x^\prime\in\mathcal{X}}\frac{|f_\theta(x)-f_\theta(x^\prime)|}{|x-x^\prime|}" title="Lipschitz Constant" />
+</p>
+the Lipschitz constant of the net w.r.t. to the input space variable.
 
 
 ## Prerequistes
