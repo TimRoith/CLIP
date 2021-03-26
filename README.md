@@ -33,9 +33,9 @@ The Lipschitz constant of the net w.r.t. to the input space variable is defined 
       <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathrm{Lip}(f_\theta)=\sup_{x,x^\prime\in\mathcal{X}}\frac{|f_\theta(x)-f_\theta(x^\prime)|}{|x-x^\prime|}." title="Lipschitz Constant" />
 </p>
 
-In the algorithm we approximate this constant on a finite subset
+In the algorithm we approximate this constant via difference quotients on a finite subset
 <p align="center">
-      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathcal{X}_{\mathrm{Lip}}\subset \mathcal{X}\times\mathcal{X}." title="Lipschitz Constant" />
+      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathcal{X}_{\mathrm{Lip}}\subset\mathcal{X}\times\mathcal{X}." title="Lipschitz Constant" />
 </p>
 
 In order to ensure that the tuples in this set correspond to point with that realize a high difference qoutient the set is updated iteratively 
@@ -44,9 +44,10 @@ via a gradient ascent scheme.
 
 
 ## Prerequistes
-Our code is implemented python and utilizes PyTorch https://pytorch.org/ (see also their git https://github.com/pytorch/pytorch). 
+Our code is implemented python and utilizes PyTorch[[2]](#2). 
 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
+<a id="2">[2]</a> https://pytorch.org/, see also their git https://github.com/pytorch/pytorch.
 
 
