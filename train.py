@@ -68,7 +68,13 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1):
         if conf.regularization == "global_lipschitz":
             # Change regularization parameter alpha
             alpha = conf.alpha
-            c_loss = c_loss + alpha * c_reg_loss
+            # check if Lipschitz term is to large. Note that regularization with 
+            # large Lipschitz terms yields instabilities!
+            if not (c_reg_loss.item() > conf.reg_max):
+                c_loss = c_loss + alpha * c_reg_loss
+            else:
+                if verbosity > 1:
+                    print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
         # Update model parameters
         c_loss.backward()
@@ -86,6 +92,7 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1):
         print(50*"-")
         print('Train Accuracy:', train_acc/tot_steps)
         print('Train Loss:', train_loss)
+        print('Lipschitz Constant', train_lip_loss)
     return {'train_loss':train_loss, 'train_acc':train_acc/tot_steps, 'u':u,'v':v, 'train_lip_loss': train_lip_loss,
             'highest_loss_idx': cache["idx"]}
 
