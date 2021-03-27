@@ -85,10 +85,10 @@ where ```[784, 400, 200, 10]``` denotes the layer dimesnions. Alternatively, you
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
 
-<b id="2">[2]</b> The Pytorch website https://pytorch.org/, see also their git https://github.com/pytorch/pytorch
+<a id="2">[2]</a> The Pytorch website https://pytorch.org/, see also their git https://github.com/pytorch/pytorch
 
-<c id="3">[3]</c> The MNIST dataset http://yann.lecun.com/exdb/mnist/
+<a id="3">[3]</a> The MNIST dataset http://yann.lecun.com/exdb/mnist/
 
-<d id="4">[4]</c> The Fashion-MNIST dataset  https://research.zalando.com/welcome/mission/research-projects/fashion-mnist/
+<a id="4">[4]</a> The Fashion-MNIST dataset  https://research.zalando.com/welcome/mission/research-projects/fashion-mnist/
 
 
