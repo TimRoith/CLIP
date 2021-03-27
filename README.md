@@ -70,6 +70,7 @@ The example loads a simple fully connected net from the file ```model.py```.
 * ```conf_arg['activation_function']```: Specifies the activation function for the net.
     * ```"ReLU"``` (Default),
     * ```"sigmoid"```.
+
 The model is then loaded via
 ```
 model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
