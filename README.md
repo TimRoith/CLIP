@@ -43,11 +43,37 @@ via a gradient ascent scheme.
 
 
 
-## Prerequistes
-Our code is implemented python and utilizes PyTorch[[2]](#2). 
+## Usage
+Our code is implemented python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
+Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
+### CUDA Settings
+*
 
+### Datasets
+The example loads the data via helper methods which then call the standard dataloaders provided by PyTorch.
+* ```conf_arg['data_file']```: Specifies the path to the dataset you wish to use. 
+* ```conf_arg['data_set']:```: Name of the dataset Currently you can choose between ```"MNIST"``` and ```"Fashion-MNIST"```. 
+The dataloaders are then created by  
+```
+train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
+```
+Note: The ```download``` flags for the PyTorch dataset methods are all set to ```False```. You can easily subsitute this by your other dataloaders as long 
+the three loaders ```train_loader, valid_loader, test_loader``` are specified.
+
+### Model
+The example loads a simple fully connected net from the file ```model.py```.
+* ```conf_arg['model']```: Specifies the model that should be loaded from ```model.py```. Currently only:
+** ```"fc"```: fully connected. 
+* ```conf_arg['activation_function']```: Specifies the activation function for the net.
+
+```
+model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
+model.to(conf.device)
+```
+where ```[784, 400, 200, 10]``` denotes the layer dimesnions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```. 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
+
 <a id="2">[2]</a> https://pytorch.org/, see also their git https://github.com/pytorch/pytorch.
 
 
