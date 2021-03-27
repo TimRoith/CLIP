@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 import adverserial_attacks as at
 
+
 class Conf:
     def __init__(self, **kwargs):
         #self.__dict__.update((key, value) for key, value in kwargs.items())
@@ -35,6 +36,7 @@ class Conf:
         self.reg_lr = kwargs.get('reg_lr', 1.0)
         self.reg_decay = kwargs.get('reg_decay', 1.3)
         self.reg_interval = kwargs.get('reg_interval', 1)
+        self.reg_max = kwargs.get('reg_max', 5e3)
         # -----------------------------
         self.reg_init = kwargs.get('reg_interval', "plain")
         if not self.reg_init in ["partial_random", "plain", "noise"]:
@@ -59,9 +61,9 @@ class Conf:
         # adverserial_attack
         self.attack = kwargs.get('attack', None)
         if self.attack == None:
-            def attack(model, x, y):
-                return x + torch.zeros_like(x)
-            self.attack = attack
+            def no_attack(model, x, y):
+                return x
+            self.attack = no_attack
 
         
         

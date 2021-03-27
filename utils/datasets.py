@@ -9,7 +9,7 @@ def get_data_set(dataset, file, batch_size, test_size=1):
     train, valid, test, train_loader, valid_loader, test_loader = [None] * 6
     if dataset == "MNIST":
         train, test = get_mnist(file)
-    elif dataset == "FashionMNIST":
+    elif dataset == "Fashion-MNIST":
         train, test = get_fashion_mnist(file)
     else:
         raise ValueError("Dataset:" + dataset + " not defined")
