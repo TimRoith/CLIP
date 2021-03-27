@@ -44,7 +44,7 @@ via a gradient ascent scheme.
 
 
 ## Usage
-Our code is implemented python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
+Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
 Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### CUDA Settings
 * ```conf_arg['use_cude']```: Boolean that specifies wether the model should be trained on the CPU.
