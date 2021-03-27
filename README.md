@@ -64,10 +64,10 @@ the three loaders ```train_loader, valid_loader, test_loader``` are specified.
 ### Model
 The example loads a simple fully connected net from the file ```model.py```.
 * ```conf_arg['model']```: Specifies the model that should be loaded from ```model.py```.
-    * ```fc``` (Dafault, currently only possibility).
+    * ```"fc"``` (Dafault, fully connected model, currently only possibility).
 * ```conf_arg['activation_function']```: Specifies the activation function for the net.
-    * ```ReLU``` (Default),
-    * ```sigmoid```.
+    * ```"ReLU"``` (Default),
+    * ```"sigmoid"```.
 The model is then loaded via
 ```
 model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
