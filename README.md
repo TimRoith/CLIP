@@ -60,7 +60,7 @@ The dataloaders are then created by
 ```
 train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
 ```
-Note: The ```download``` flags for the PyTorch dataset methods are all set to ```False```. You can easily subsitute this by your other dataloaders as long 
+Note: The ```download``` flags for the torchvision dataset methods are all set to ```False```. You can easily subsitute this by your other dataloaders as long 
 the three loaders ```train_loader, valid_loader, test_loader``` are specified.
 
 ### Model
