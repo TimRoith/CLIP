@@ -21,7 +21,7 @@ The CLIP Algorithm proposes a regularization for controlling the Lipschitz const
 parametrized by weights <img src="https://latex.codecogs.com/svg.latex?\theta" title="weights"/> the goal is to minimize a loss term of the form
 
 <p align="center">
-      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta}(x),y)+\mathrm{Lip}(f_\theta)," title="Lipschitz Loss" />
+      <img src="https://latex.codecogs.com/svg.latex?\Large&space;\frac{1}{|\mathcal{T}|}\sum_{(x,y)\in\mathcal{T}}l(f_{\theta}(x),y)+\lambda~\mathrm{Lip}(f_\theta)," title="Lipschitz Loss" />
 </p>
 
 where
