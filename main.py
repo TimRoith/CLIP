@@ -8,7 +8,7 @@ import adverserial_attacks as at
 
 import matplotlib.pyplot as plt
 
-data_file = "../Bregman/data"
+data_file = "/"
 
 conf_args = {'alpha':0.0, 'data_file':data_file, 'use_cuda':True, 'regularization': "global_lipschitz"}
 conf_args['attack'] = at.gauss_noise(0.2)
