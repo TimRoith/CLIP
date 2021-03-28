@@ -47,8 +47,7 @@ via a gradient ascent scheme.
 Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
 Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### CUDA Settings
-* ```conf_arg['use_cude']```: Boolean that specifies wether the model should be trained on the CPU.
-    * Default: ```False```.
+* ```conf_arg['use_cude']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
 
 ### Datasets
 The example loads the data via helper methods which then call the standard dataloaders provided by PyTorch.
@@ -78,6 +77,14 @@ model.to(conf.device)
 ```
 where ```[784, 400, 200, 10]``` denotes the layer dimesnions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```.
 ### Regularization
+You can specify the following options for the regularizer:
+* ```conf_arg['regularization']```: Specifies which regularization to use:
+    * ```"global_lipschitz"```: activates the CLIP reguarization as described above (Default),
+    * ```"none"```: decativates any kind of additional regularization.
+* ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
+* ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
+* ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_lr=1```.
+* ```conf_arg['reg_max']```: Specifies the maximum value of a Lipschitz constant that is allowed to enter the backprop. Note, that large Lipschitz regularization terms yield numerical instabilities, default: ```reg_max=5e3```.
 
 ### Optimizer
 
