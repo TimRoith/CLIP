@@ -96,8 +96,10 @@ You can specify the following options for the regularizer:
 ### Adverserial Attack
 General:
 * ```gauss_attack(nl=1.0)```:
-* ```fgsm(model, loss, epsilon=0.3):
-* ```pgd(model, loss, epsilon=None, alpha=None, alpha_mul=1.0, restarts=1, attack_iters=7, norm_type="l2")
+
+* ```fgsm(model, loss, epsilon=0.3)```:
+
+* ```pgd(model, loss, epsilon=None, alpha=None, alpha_mul=1.0, restarts=1, attack_iters=7, norm_type="l2")```:
 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
