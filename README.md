@@ -49,6 +49,32 @@ Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### CUDA Settings
 * ```conf_arg['use_cude']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
 
+### Regularization
+You can specify the following options for the regularizer:
+* ```conf_arg['regularization']```: Specifies which regularization to use:
+    * ```"global_lipschitz"```: activates the CLIP reguarization as described above (Default),
+    * ```"none"```: decativates any kind of additional regularization.
+* ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
+* ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
+* ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_interval=1```.
+* ```conf_arg['reg_max']```: Specifies the maximum value of a Lipschitz constant that is allowed to enter the backprop. Note, that large Lipschitz regularization terms yield numerical instabilities, default: ```reg_max=5e3```.
+* ```conf_arg['reg_init']```: Specifies the initialization strategy of the Lipschitz set.
+    * ```"plain"```: Splits a batch of the loader equally and assigns each half to ```u``` and ```v``` (Default).
+    * ```"partial_random"```: Assigns ```u``` to a batch of the loader and sets ```v = u + delta```, where ```delta``` is sampled from gaussian distribution.
+    * ```"noise"```: Chooses ```u,v``` as samples from the normal distribution.
+* ```conf_arg['goal_accuracy']```:
+* ```conf_arg['alpha']```:
+* ```conf_arg['alpha_incremental']```:
+
+### Adversarial Attack
+General:
+* ```gauss_attack(nl=1.0)```:
+
+* ```fgsm(model, loss, epsilon=0.3)```:
+
+* ```pgd(model, loss, epsilon=None, alpha=None, alpha_mul=1.0, restarts=1, attack_iters=7, norm_type="l2")```:
+
+
 ### Datasets
 The example loads the data via helper methods which then call the standard dataloaders provided by PyTorch.
 * ```conf_arg['data_file']```: Specifies the path to the dataset you wish to use. 
@@ -76,30 +102,6 @@ model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
 model.to(conf.device)
 ```
 where ```[784, 400, 200, 10]``` denotes the layer dimesnions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```.
-### Regularization
-You can specify the following options for the regularizer:
-* ```conf_arg['regularization']```: Specifies which regularization to use:
-    * ```"global_lipschitz"```: activates the CLIP reguarization as described above (Default),
-    * ```"none"```: decativates any kind of additional regularization.
-* ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
-* ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
-* ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_interval=1```.
-* ```conf_arg['reg_max']```: Specifies the maximum value of a Lipschitz constant that is allowed to enter the backprop. Note, that large Lipschitz regularization terms yield numerical instabilities, default: ```reg_max=5e3```.
-* ```conf_arg['reg_init']```: Specifies the initialization strategy of the Lipschitz set.
-    * ```"plain"```: Splits a batch of the loader equally and assigns each half to ```u``` and ```v``` (Default).
-    * ```"partial_random"```: Assigns ```u``` to a batch of the loader and sets ```v = u + delta```, where ```delta``` is sampled from gaussian distribution.
-    * ```"noise"```: Chooses ```u,v``` as samples from the normal distribution.
-* ```conf_arg['goal_accuracy']```:
-* ```conf_arg['alpha']```:
-* ```conf_arg['alpha_incremental']```:
-
-### Adverserial Attack
-General:
-* ```gauss_attack(nl=1.0)```:
-
-* ```fgsm(model, loss, epsilon=0.3)```:
-
-* ```pgd(model, loss, epsilon=None, alpha=None, alpha_mul=1.0, restarts=1, attack_iters=7, norm_type="l2")```:
 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
