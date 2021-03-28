@@ -12,7 +12,7 @@ class Conf:
         self.activation_function = kwargs.get('activation_function', "ReLU")
         
         # dataset
-        self.dataset = kwargs.get('dataset', "MNIST")
+        self.data_set = kwargs.get('data_set', "MNIST")
         self.data_file = kwargs.get('data_file', "data")
         
         # CUDA settings
@@ -61,9 +61,6 @@ class Conf:
         # adverserial_attack
         self.attack = kwargs.get('attack', None)
         if self.attack == None:
-            def no_attack(model, x, y):
+            def no_attack(x, y):
                 return x
             self.attack = no_attack
-
-        
-        
