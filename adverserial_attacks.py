@@ -26,7 +26,7 @@ class gauss_attack(attack):
     
 # fgsm attack
 class fgsm(attack):
-    def __init__(self, model, loss, epsilon=0.3, x_min=0.0, x_max=0.0):
+    def __init__(self, model, loss, epsilon=0.3, x_min=0.0, x_max=1.0):
         super(fgsm, self).__init__(model = model)
         self.epsilon = epsilon
         self.loss = loss
@@ -44,7 +44,7 @@ class fgsm(attack):
         # get example
         grad = delta.grad.detach()
         delta.data = delta + self.epsilon * torch.sign(grad)
-        return torch.clamp(x + delta.detach(), self.x_min, self.x_max)
+        return torch.clamp(x + delta.detach(), min=self.x_min, max=self.x_max)
     
     
 
@@ -105,9 +105,9 @@ class pgd(attack):
                 if self.norm_type == "linf":
                     d = torch.clamp(delta + self.alpha * torch.sign(grad), -self.epsilon, self.epsilon)
                 else:
-                    d = delta + alpha * torch.sign(grad)
+                    d = delta + self.alpha * torch.sign(grad)
                     d = d / torch.norm(d.view(d.shape[0], -1), p=2, dim=1).view(d.shape[0], 1, 1, 1) * self.epsilon
-                d = clamp(d, lower_limit - X, upper_limit - X)
+                d = clamp(d, self.x_min - x, self.x_max - x)
                 delta.data[index] = d[index]
                 delta.grad.zero_()
         return x + delta.detach()
