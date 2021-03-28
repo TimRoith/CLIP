@@ -83,12 +83,21 @@ You can specify the following options for the regularizer:
     * ```"none"```: decativates any kind of additional regularization.
 * ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
 * ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
-* ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_lr=1```.
+* ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_interval=1```.
 * ```conf_arg['reg_max']```: Specifies the maximum value of a Lipschitz constant that is allowed to enter the backprop. Note, that large Lipschitz regularization terms yield numerical instabilities, default: ```reg_max=5e3```.
-
-### Optimizer
+* ```conf_arg['reg_init']```: Specifies the initialization strategy of the Lipschitz set.
+    * ```"plain"```: Splits a batch of the loader equally and assigns each half to ```u``` and ```v``` (Default).
+    * ```"partial_random"```: Assigns ```u``` to a batch of the loader and sets ```v = u + delta```, where ```delta``` is sampled from gaussian distribution.
+    * ```"noise"```: Chooses ```u,v``` as samples from the normal distribution.
+* ```conf_arg['goal_accuracy']```:
+* ```conf_arg['alpha']```:
+* ```conf_arg['alpha_incremental']```:
 
 ### Adverserial Attack
+General:
+* ```gauss_attack(nl=1.0)```:
+* ```fgsm(model, loss, epsilon=0.3):
+* ```pgd(model, loss, epsilon=None, alpha=None, alpha_mul=1.0, restarts=1, attack_iters=7, norm_type="l2")
 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
