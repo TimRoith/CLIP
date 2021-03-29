@@ -4,23 +4,31 @@ from utils.configuration import Conf
 from utils.datasets import get_data_set
 import models
 from train import train_step, validation_step
-import adverserial_attacks as at
+import adversarial_attacks as at
+
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
-data_file = "/"
+data_file = "../Bregman/data"
 
-conf_args = {'alpha':0.0, 'data_file':data_file, 'use_cuda':True, 'regularization': "global_lipschitz"}
-conf_args['attack'] = at.gauss_noise(0.2)
+conf_args = {'alpha':0.00,'data_file':data_file, 'use_cuda':True, 'train_split':0.9, 'num_workers':4,
+             'regularization': "none", 'reg_init': "partial_random"}
 conf = Conf(**conf_args)
+
 
 #%% get train, validation and test loader
 
-train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
+train_loader, valid_loader, test_loader = get_data_set(conf)
 
 # # %% deine the model
 model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
 model.to(conf.device)
+
+# define the adverserial attack
+conf.attack = at.fgsm(model, conf.loss)
+#conf.attack = at.pgd(model, conf.loss, attack_iters=5)
 
 
 
