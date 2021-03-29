@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import adverserial_attacks as at
+import adversarial_attacks as at
 
 
 class Conf:
@@ -14,10 +14,13 @@ class Conf:
         # dataset
         self.data_set = kwargs.get('data_set', "MNIST")
         self.data_file = kwargs.get('data_file', "data")
+        self.train_split = kwargs.get('train_split', 0.9)
+        self.im_shape = None
         
         # CUDA settings
         self.use_cuda = kwargs.get('use_cuda', False)
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
+        self.num_workers = kwargs.get('num_workers', 1)
         
         # Loss function and norm
         def l2_norm(X):
@@ -38,7 +41,7 @@ class Conf:
         self.reg_interval = kwargs.get('reg_interval', 1)
         self.reg_max = kwargs.get('reg_max', 5e3)
         # -----------------------------
-        self.reg_init = kwargs.get('reg_interval', "plain")
+        self.reg_init = kwargs.get('reg_init', "plain")
         if not self.reg_init in ["partial_random", "plain", "noise"]:
             raise ValueError("Unknown regularization initialization specified.")
         # -----------------------------
@@ -55,12 +58,10 @@ class Conf:
  
         # specification for Training
         self.epochs = kwargs.get('epochs', 100)
-        self.batch_size = kwargs.get('batch_size', 100)
+        self.batch_size = kwargs.get('batch_size', 128)
         self.lr = kwargs.get('lr', 100)
         
         # adverserial_attack
         self.attack = kwargs.get('attack', None)
         if self.attack == None:
-            def no_attack(x, y):
-                return x
-            self.attack = no_attack
+            self.attack = at.no_attack()
