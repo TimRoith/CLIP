@@ -5,16 +5,18 @@ import torch
 import os
 
 
-def get_data_set(dataset, file, batch_size, test_size=1):
+def get_data_set(conf, test_size=1):
     train, valid, test, train_loader, valid_loader, test_loader = [None] * 6
-    if dataset == "MNIST":
-        train, test = get_mnist(file)
-    elif dataset == "Fashion-MNIST":
-        train, test = get_fashion_mnist(file)
+    if conf.data_set == "MNIST":
+        conf.im_shape = [1,28,28]
+        train, test = get_mnist(conf.data_file)
+    elif conf.data_set == "Fashion-MNIST":
+        conf.im_shape = [3,28,28]
+        train, test = get_fashion_mnist(conf.data_file)
     else:
-        raise ValueError("Dataset:" + dataset + " not defined")
-    train_loader, valid_loader, test_loader = train_valid_test_split(train, test, batch_size, train_split=0.9,
-                                                                     test_size=test_size)
+        raise ValueError("Dataset:" + conf.data_set + " not defined")
+    train_loader, valid_loader, test_loader = train_valid_test_split(train, test, conf.batch_size, train_split=conf.train_split,
+                                                                     test_size=test_size,num_workers=conf.num_workers)
 
     return train_loader, valid_loader, test_loader
 
@@ -66,7 +68,7 @@ def get_lower_and_upper_limits():
     return lower_limit, upper_limit
 
 
-def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1):
+def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1, num_workers=1):
     total_count = len(train)
     train_count = int(train_split * total_count)
     val_count = total_count - train_count
@@ -77,8 +79,8 @@ def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1
         _count = len(test) - test_count
         test, _ = torch.utils.data.random_split(test, [test_count, _count])
 
-    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, pin_memory=True)
-    valid_loader = DataLoader(val, batch_size=1000, shuffle=True, pin_memory=True)
-    test_loader = DataLoader(test, batch_size=batch_size, shuffle=False, pin_memory=True)
+    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
+    valid_loader = DataLoader(val, batch_size=1000, shuffle=True, pin_memory=True, num_workers=num_workers)
+    test_loader = DataLoader(test, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
 
     return train_loader, valid_loader, test_loader
