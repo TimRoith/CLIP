@@ -13,13 +13,13 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1):
     train_lip_loss = 0.0
     
     # define the set XLip as cycle
-    lip_cycle = cycle(lip_loader)
+    if  not lip_loader is None:
+        lip_cycle = cycle(lip_loader)
     
-    im_shape = train_loader.dataset.dataset.data.shape[1:]
     # Initialization for adverserial pairs
-    cache = {}
-    u = torch.tensor((1, *im_shape)).to(conf.device)
-    v = torch.tensor((1, *im_shape)).to(conf.device)
+    cache = {'idx':0}
+    u = torch.tensor((1, *conf.im_shape)).to(conf.device)
+    v = torch.tensor((1, *conf.im_shape)).to(conf.device)
     
     # -------------------------------------------------------------------------
     # loop over all batches
@@ -111,7 +111,7 @@ def validation_step(conf, model, validation_loader, u_reg, v_reg, verbosity = 1)
         x, y = x.to(conf.device), y.to(conf.device)
 
         # update x to a adverserial example
-        x = conf.attack(model, x, y)
+        x = conf.attack(x, y)
         
          # evaluate model on batch
         logits = model(x)
