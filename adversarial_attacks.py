@@ -6,7 +6,7 @@ class attack:
         self.model = model
 
 # No attack     
-class no_att(attack):
+class no_attack(attack):
     #
     def __call__(self, x, y):
         return x
