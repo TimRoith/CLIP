@@ -15,7 +15,7 @@ class no_attack(attack):
 
 # get gauss noise augmentation. Magnitude is dependent on noise level
 class gauss_attack(attack):
-    def __init__(self, nl):
+    def __init__(self, nl=1.0):
         super(gauss_attack, self).__init__()
         self.nl = nl
     
@@ -107,7 +107,7 @@ class pgd(attack):
                 else:
                     d = delta + self.alpha * torch.sign(grad)
                     d = d / torch.norm(d.view(d.shape[0], -1), p=2, dim=1).view(d.shape[0], 1, 1, 1) * self.epsilon
-                d = clamp(d, self.x_min - x, self.x_max - x)
+                #d = clamp(d, self.x_min - x, self.x_max - x)
                 delta.data[index] = d[index]
                 delta.grad.zero_()
         return x + delta.detach()
