@@ -1,6 +1,5 @@
 import torch
 
-
 class attack:
     def __init__(self, model=None):
         self.model = model
@@ -84,6 +83,10 @@ class pgd(attack):
           
     def __call__(self, x, y):
         delta_init = get_delta(x, self.epsilon, uniform=True)
+        
+        if self.norm_type == "l2":
+            delta_init = delta_init / torch.norm(delta_init.view(delta_init.shape[0], -1), p=2, dim=1).view(delta_init.shape[0], 1, 1, 1) * self.epsilon
+        
         delta = delta_init.clone()
         index = torch.arange(0, x.shape[0], dtype=torch.long)
         # Restarting the attack to prevent getting stuck
