@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
 
-data_file = "../Bregman/data"
+data_file = "/"
 
 conf_args = {'alpha':0.01,'data_file':data_file, 'use_cuda':True, 'train_split':0.9, 'num_workers':4,
              'regularization': "global_lipschitz", 'reg_init': "partial_random",'reg_lr':10,
