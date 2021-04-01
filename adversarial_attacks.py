@@ -109,11 +109,12 @@ class pgd(attack):
                     d = torch.clamp(delta + self.alpha * torch.sign(grad), -self.epsilon, self.epsilon)
                 else:
                     d = delta + self.alpha * torch.sign(grad)
+                    # d = clamp(d, self.x_min - x, self.x_max - x)
                     d = d / torch.norm(d.view(d.shape[0], -1), p=2, dim=1).view(d.shape[0], 1, 1, 1) * self.epsilon
-                #d = clamp(d, self.x_min - x, self.x_max - x)
+                #
                 delta.data[index] = d[index]
                 delta.grad.zero_()
-        return x + delta.detach()
+        return torch.clamp(x + delta.detach(), self.x_min, self.x_max)
                     
 
 
