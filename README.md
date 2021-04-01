@@ -47,7 +47,7 @@ via a gradient ascent scheme.
 Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
 Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### CUDA Settings
-* ```conf_arg['use_cude']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
+* ```conf_arg['use_cuda']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
 
 ### Regularization
 You can specify the following options for the regularizer:
