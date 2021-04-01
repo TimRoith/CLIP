@@ -16,6 +16,8 @@ class Conf:
         self.data_file = kwargs.get('data_file', "data")
         self.train_split = kwargs.get('train_split', 0.9)
         self.im_shape = None
+        self.x_min = 0.0
+        self.x_max = 1.0
         
         # CUDA settings
         self.use_cuda = kwargs.get('use_cuda', False)
@@ -23,8 +25,8 @@ class Conf:
         self.num_workers = kwargs.get('num_workers', 1)
         
         # Loss function and norm
-        def l2_norm(X):
-            return torch.norm(X.view(X.shape[0], -1), p=2, dim=1)
+        def l2_norm(x):
+            return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
         self.loss = kwargs.get('loss', F.cross_entropy)
         self.in_norm = kwargs.get('in_norm', l2_norm)
         self.out_norm = kwargs.get('out_norm', l2_norm)
