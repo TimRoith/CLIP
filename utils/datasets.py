@@ -9,7 +9,7 @@ def get_data_set(conf, test_size=1):
     train, valid, test, train_loader, valid_loader, test_loader = [None] * 6
     if conf.data_set == "MNIST":
         conf.im_shape = [1,28,28]
-        train, test = get_mnist(conf.data_file)
+        train, test = get_mnist(conf)
     elif conf.data_set == "Fashion-MNIST":
         conf.im_shape = [3,28,28]
         train, test = get_fashion_mnist(conf.data_file)
@@ -20,14 +20,11 @@ def get_data_set(conf, test_size=1):
 
     return train_loader, valid_loader, test_loader
 
-def get_mnist(file):
-    transform_train = get_transform("MNIST", 1, 28, True)
-    transforms_test = get_transform("MNIST", 1, 28, False)
-
-    train = datasets.MNIST(file, train=True, download=False,
-                           transform=transform_train)
-    test = datasets.MNIST(file, train=False, download=False, 
-                          transform=transforms_test)
+def get_mnist(conf):
+    transform = get_transform(conf, 1, 28, True)
+    #
+    train = datasets.MNIST(conf.data_file, train=True, download=False, transform=transform)
+    test = datasets.MNIST(conf.data_file, train=False, download=False, transform=transform)
     return train, test
 
 def get_fashion_mnist(file):
@@ -39,40 +36,31 @@ def get_fashion_mnist(file):
     return train, test
 
 
-def get_transform(data_set, channels, size, train):
+def get_transform(conf, channels, size, train):
     t = []
     t.append(transforms.ToTensor())
-    if data_set == "MNIST":
-        t.append(transforms.Normalize((0.1307,), (0.3081,))),
+    
+    # normalization for MNIST
+    if conf.data_set == "MNIST":
+        # mean and std
+        mean = 0.1307
+        std = 0.3081
+        # update limits
+        conf.x_min = (conf.x_min-mean)/std
+        conf.x_max = (conf.x_max-mean)/std
+        # add normalize to the transform
+        t.append(transforms.Normalize((mean,), (std,))),
+    
+    # compose the transform
     transform = transforms.Compose(t)
     return transform
-
-def get_mean_std(data_set):
-    mean = 0.
-    std = 1.
-    if data_set == "MNIST":
-        channels = 1
-    elif data_set == "FashionMNIST":
-        channels = 3
-        
-    # calculate mean and std
-    if channels == 3:
-        return torch.tensor(mean).view(3, 1, 1).cuda(), torch.tensor(std).view(3, 1, 1).cuda()
-    else:
-        return torch.tensor(mean), torch.tensor(std)
-
-
-def get_lower_and_upper_limits():
-    lower_limit = 0.
-    upper_limit = 1.
-    return lower_limit, upper_limit
 
 
 def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1, num_workers=1):
     total_count = len(train)
     train_count = int(train_split * total_count)
     val_count = total_count - train_count
-    train, val = torch.utils.data.random_split(train, [train_count, val_count])
+    train, val = torch.utils.data.random_split(train, [train_count, val_count],generator=torch.Generator().manual_seed(42))
 
     if test_size != 1:
         test_count = int(len(test) * test_size)
@@ -80,7 +68,7 @@ def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1
         test, _ = torch.utils.data.random_split(test, [test_count, _count])
 
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
-    valid_loader = DataLoader(val, batch_size=1000, shuffle=True, pin_memory=True, num_workers=num_workers)
+    valid_loader = DataLoader(val, batch_size=1000, shuffle=False, pin_memory=True, num_workers=num_workers)
     test_loader = DataLoader(test, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
 
     return train_loader, valid_loader, test_loader
