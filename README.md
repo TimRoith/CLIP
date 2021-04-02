@@ -63,8 +63,8 @@ You can specify the following options for the regularizer:
     * ```"partial_random"```: Assigns ```u``` to a batch of the loader and sets ```v = u + delta```, where ```delta``` is sampled from gaussian distribution.
     * ```"noise"```: Chooses ```u,v``` as samples from the normal distribution.
 * ```conf_arg['goal_accuracy']```:
-* ```conf_arg['alpha']```:
-* ```conf_arg['alpha_incremental']```:
+* ```conf_arg['lamda']```: The regularization parameter, note that we use this spelling, because ```lambda``` is blocked keyword. Secondly ```lamda``` is actually the correct spelling of the greek letter, default: ```lamda=0.0```.
+* ```conf_arg['alpha_incremental']```: The incremental update for the regularization parameter as described in [[1]](#1).
 
 ### Adversarial Attack
 General:
@@ -81,6 +81,7 @@ The example loads the data via helper methods which then call the standard datal
 * ```conf_arg['data_set']:```: Name of the dataset. 
     * ```"MNIST"``` (Default, [[3]](#3))
     * ```"Fashion-MNIST"``` ([[4]](#4)). 
+
 The dataloaders are then created by  
 ```
 train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
