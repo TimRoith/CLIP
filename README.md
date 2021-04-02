@@ -64,7 +64,7 @@ You can specify the following options for the regularizer:
     * ```"noise"```: Chooses ```u,v``` as samples from the normal distribution.
 * ```conf_arg['goal_accuracy']```:
 * ```conf_arg['lamda']```: The regularization parameter, note that we use this spelling, because ```lambda``` is blocked keyword. Secondly ```lamda``` is actually the correct spelling of the greek letter, default: ```lamda=0.0```.
-* ```conf_arg['alpha_incremental']```: The incremental update for the regularization parameter as described in [[1]](#1).
+* ```conf_arg['lamda_incremental']```: The incremental update for the regularization parameter as described in [[1]](#1).
 
 ### Adversarial Attack
 General:
