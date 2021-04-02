@@ -1,8 +1,7 @@
 import torch
 
 class attack:
-    def __init__(self, model=None):
-        self.model = model
+    pass
 
 # No attack     
 class no_attack(attack):
@@ -19,25 +18,25 @@ class gauss_attack(attack):
         self.nl = nl
     
     #
-    def __call__(self, x, y):
+    def __call__(self, model, x, y):
         return x+torch.randn_like(x) * self.nl
 
     
 # fgsm attack
 class fgsm(attack):
-    def __init__(self, model, loss, epsilon=0.3, x_min=0.0, x_max=1.0):
-        super(fgsm, self).__init__(model = model)
+    def __init__(self, loss, epsilon=0.3, x_min=0.0, x_max=1.0):
+        super(fgsm, self).__init__()
         self.epsilon = epsilon
         self.loss = loss
         self.x_min = x_min
         self.x_max = x_max
         
-    def __call__(self, x, y):
+    def __call__(self, model, x, y):
         #get delta
         delta = get_delta(x, self.epsilon, x_min=self.x_min, x_max=self.x_max)
         delta.requires_grad = True
         # get loss
-        pred = self.model(x + delta)
+        pred = model(x + delta)
         loss = self.loss(pred, y)
         loss.backward()
         # get example
@@ -50,9 +49,9 @@ class fgsm(attack):
 class pgd(attack):
     '''pgd attack where the attack is not updated for samples where it was already successful
     (this gives a better lower bound on the robustness)'''
-    def __init__(self, model, loss, epsilon=None, x_min=0.0, x_max=1.0, restarts=1, 
+    def __init__(self, loss, epsilon=None, x_min=0.0, x_max=1.0, restarts=1, 
                  attack_iters=7, alpha=None, alpha_mul=1.0, norm_type="l2"):
-        super(pgd, self).__init__(model = model)
+        super(pgd, self).__init__()
         self.loss = loss
         self.x_min = x_min
         self.x_max = x_max
@@ -81,7 +80,7 @@ class pgd(attack):
             self.alpha = alpha
             
           
-    def __call__(self, x, y):
+    def __call__(self, model, x, y):
         delta_init = get_delta(x, self.epsilon, uniform=True)
         
         if self.norm_type == "l2":
@@ -96,7 +95,7 @@ class pgd(attack):
                 delta.data[index] = delta_init[index]
 
             for _ in range(self.attack_iters):
-                pred = self.model(x + delta)
+                pred = model(x + delta)
                 # indexes are used to determine which samples needs to be updated
                 index = torch.where(pred.max(1)[1] == y)[0]
                 if len(index) == 0:
@@ -116,9 +115,7 @@ class pgd(attack):
                 delta.grad.zero_()
         return torch.clamp(x + delta.detach(), self.x_min, self.x_max)
                     
-
-
-                    
+                
 def clamp(x, x_min, x_max):
     return torch.max(torch.min(x, x_max), x_min)
                     
