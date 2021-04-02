@@ -54,9 +54,9 @@ class Conf:
         if not self.reg_update  in ["adverserial_update"]:
             raise ValueError("Unknown regularization update specified.")
         # -----------------------------
-        self.alpha = kwargs.get('alpha', 0.0)
+        self.lamda = kwargs.get('lamda', 0.0)
         self.goal_accuracy = kwargs.get('goal_accuracy', 0.9)
-        self.alpha_incremental = kwargs.get('alpha_incremental', 0.0001)
+        self.lamda_incremental = kwargs.get('lamda_incremental', 0.0001)
  
         # specification for Training
         self.epochs = kwargs.get('epochs', 100)
@@ -67,3 +67,6 @@ class Conf:
         self.attack = kwargs.get('attack', None)
         if self.attack == None:
             self.attack = at.no_attack()
+
+        
+        
