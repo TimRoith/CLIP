@@ -2,7 +2,7 @@ import torch
 import regularizer as reg
 from itertools import cycle
 
-def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1, u = None, v = None, cache = None):
+def train_step(conf, model, opt, train_loader, lip_loader, cache, verbosity = 1):
     # train phase
     model.train()
     
@@ -16,12 +16,6 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1, u = No
     if  not lip_loader is None:
         lip_cycle = cycle(lip_loader)
     
-    # Initialization for adverserial pairs
-    if (u is None) or (v is None) or (cache is None):
-        cache = {'idx':0}
-        u = torch.tensor((1, *conf.im_shape)).to(conf.device)
-        v = torch.tensor((1, *conf.im_shape)).to(conf.device)
-    
     # -------------------------------------------------------------------------
     # loop over all batches
     for batch_idx, (x, y) in enumerate(train_loader):
@@ -33,15 +27,17 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1, u = No
             # ---------------------------------------------------------------------
             # Adverserial update
             # ---------------------------------------------------------------------
-            # get initialization for Lipschitz Training set
-            # if i is a muliple of the reg_increment or         
-            if ((batch_idx % conf.reg_incremental) == 0) and (not ("init" in cache)):
-                cache["init"] = reg.u_v_init(conf, lip_cycle, cache)
-            else: # reset the initial u,v to the new pair found in the step before
-                cache["init"] = torch.cat((u, v)).detach()
+            # get initialization for Lipschitz Training set      
+            if ((cache['counter'] % conf.reg_incremental) == 0) or (not ('init' in cache)):
+                if verbosity > 0:
+                    print('The Lipschitz set was reset')
+                cache['init'] = reg.u_v_init(conf, lip_cycle, cache)
+                cache['counter'] = 1
+            else:
+                cache['counter'] += 1
 
             # adverserial update on the Lipschitz set
-            u, v, cache = reg.search_u_v(conf, model, cache=cache)
+            u, v = reg.search_u_v(conf, model, cache)
             # ---------------------------------------------------------------------
 
             # Use either all tuples or only one tuple for regularization
@@ -94,15 +90,14 @@ def train_step(conf, model, opt, train_loader, lip_loader, verbosity = 1, u = No
         print('Train Loss:', train_loss)
         print('Lipschitz Constant', train_lip_loss)
     return {'train_loss':train_loss, 'train_acc':train_acc/tot_steps, 'u':u,'v':v, 'train_lip_loss': train_lip_loss,
-            'highest_loss_idx': cache["idx"], 'cache':cache}
+            'cache':cache}
 
 
 
-def validation_step(conf, model, validation_loader, u_reg, v_reg, verbosity = 1):
+def validation_step(conf, model, validation_loader, verbosity = 1):
     val_acc = 0.0
     val_loss = 0.0
     tot_steps = 0
-    val_lip_loss = 0.0
     
     # -------------------------------------------------------------------------
     # loop over all batches
@@ -111,29 +106,23 @@ def validation_step(conf, model, validation_loader, u_reg, v_reg, verbosity = 1)
         x, y = x.to(conf.device), y.to(conf.device)
 
         # update x to a adverserial example
-        x = conf.attack(x, y)
+        x = conf.attack(model, x, y)
         
          # evaluate model on batch
         logits = model(x)
         
         # Get classification loss
         c_loss = conf.loss(logits, y)
-        if conf.regularization == "global_lipschitz":
-            c_reg_loss = reg.lip_constant(conf, model, u_reg, v_reg, mean=conf.reg_all)
-            c_loss = c_loss + conf.lamda * c_reg_loss
         
         val_acc += (logits.max(1)[1] == y).sum().item()
         val_loss += c_loss.item()
-        if conf.regularization == "global_lipschitz":
-            val_lip_loss = max(c_reg_loss.item(), val_lip_loss)
         tot_steps += y.shape[0]
         
     # print accuracy
     if verbosity > 0: 
         print(50*"-")
         print('Validation Accuracy:', val_acc/tot_steps)
-        print('Validation Lipschitz constant', val_lip_loss)
-    return {'val_loss':val_loss, 'val_acc':val_acc/tot_steps, 'val_lip_loss': val_lip_loss}
+    return {'val_loss':val_loss, 'val_acc':val_acc/tot_steps}
 
 def test_step(conf, model, test_loader, attack = None, verbosity = 1):
     model.eval()
@@ -151,7 +140,7 @@ def test_step(conf, model, test_loader, attack = None, verbosity = 1):
         x, y = x.to(conf.device), y.to(conf.device)
 
         # update x to a adverserial example
-        x = attack(x, y)
+        x = attack(model, x, y)
         
          # evaluate model on batch
         logits = model(x)
@@ -168,3 +157,66 @@ def test_step(conf, model, test_loader, attack = None, verbosity = 1):
         print(50*"-")
         print('Test Accuracy:', test_acc/tot_steps)
     return {'test_loss':test_loss, 'test_acc':test_acc/tot_steps}
+
+
+class best_model:
+    '''saves the best model'''
+    def __init__(self, best_model=None, gamma = 0.0):
+        # stores best seen score and model
+        self.best_score = 0.0
+        
+        # if specified, a copy of the model gets saved into this variable
+        self.best_model = best_model
+
+        # score function
+        def score_fun(train_acc, test_acc):
+            return gamma * train_acc + (1-gamma) * test_acc
+        self.score_fun = score_fun
+    
+    def __call__(train_acc, val_acc, model=None):
+        # evaluate score
+        score = self.score_fun(train_acc, val_acc)
+        if score >= self.best_score:
+            self.best_score = score
+            # store model
+            if self.best_model is not None:
+                self.best_model.load_state_dict(model.state_dict())
+                
+                
+
+class lamda_scheduler:
+    '''scheduler for the regularization parameter'''
+    def __init__(self, conf, warmup = 5, warmup_lamda = 0.0, cooldown=0):
+        self.conf = conf
+        
+        # warm up
+        self.warmup = warmup
+        self.warmup_lamda = warmup_lamda
+        
+        # save real lamda
+        self.lamda = conf.lamda
+        
+        # cooldown
+        self.cooldown_val = cooldown
+        self.cooldown = cooldown
+         
+    def __call__(self, conf, train_acc):
+        # check if we are still in the warm up phase
+        if self.warmup > 0:
+            self.warmup -= 1
+            conf.lamda = self.warmup_lamda
+        elif self.warmup == 0:
+            self.warmup = -1
+            conf.lamda = self.lamda
+        else:
+            # cooldown 
+            if self.cooldown_val > 0:
+                self.cooldown_val -= 1 
+            else: # cooldown is over, time to update and reset
+                self.cooldown_val = self.cooldown
+
+                # discrepancy principle for lamda
+                if train_acc > conf.goal_acc:
+                    conf.lamda += conf.lamda_increment
+                else:
+                    conf.lamda -= conf.lamda_increment
