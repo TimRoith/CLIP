@@ -1,12 +1,11 @@
 import torch
 import torch.nn.functional as F
 import adversarial_attacks as at
+import models
 
 
 class Conf:
     def __init__(self, **kwargs):
-        #self.__dict__.update((key, value) for key, value in kwargs.items())
-        
         # model
         self.model = kwargs.get('model', "fc")
         self.activation_function = kwargs.get('activation_function', "ReLU")
@@ -48,25 +47,43 @@ class Conf:
             raise ValueError("Unknown regularization initialization specified.")
         # -----------------------------
         self.reg_all = kwargs.get('reg_all', False)
-        self.reg_incremental = kwargs.get('reg_incremental', 100000)
+        self.reg_incremental = kwargs.get('reg_incremental', 2000)
         # -----------------------------
         self.reg_update = kwargs.get('reg_incremental', "adverserial_update")
         if not self.reg_update  in ["adverserial_update"]:
             raise ValueError("Unknown regularization update specified.")
         # -----------------------------
         self.lamda = kwargs.get('lamda', 0.0)
-        self.goal_accuracy = kwargs.get('goal_accuracy', 0.9)
-        self.lamda_incremental = kwargs.get('lamda_incremental', 0.0001)
+        self.lamda_increment = kwargs.get('lamda_increment', 0.0)
+        self.goal_acc = kwargs.get('goal_accuracy', 0.9)
  
         # specification for Training
         self.epochs = kwargs.get('epochs', 100)
         self.batch_size = kwargs.get('batch_size', 128)
-        self.lr = kwargs.get('lr', 100)
+        self.lr = kwargs.get('lr', 0.1)
         
         # adverserial_attack
         self.attack = kwargs.get('attack', None)
         if self.attack == None:
             self.attack = at.no_attack()
+            
+            
+# -----------------------------
+# Example 1
+# -----------------------------
+def pgd_example(data_file, use_cuda=False, num_workers=None):
+    if use_cuda and num_workers is None:
+        num_workers = 4
+    else:
+        num_workers = 0
+    
+    conf_args = {'lamda':0.1,'data_file':data_file, 'use_cuda':use_cuda, 'train_split':0.9, 'num_workers':num_workers,
+                 'regularization': "global_lipschitz", 'reg_init': "partial_random",'reg_lr':10,
+                 'activation_function':"sigmoid"}
 
-        
-        
+    # get configuration
+    conf = Conf(**conf_args)
+    
+    # set attack
+    conf.attack = at.pgd(conf.loss, epsilon=8.0, x_min=conf.x_min,x_max=conf.x_max)
+    return conf
