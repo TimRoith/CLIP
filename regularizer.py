@@ -1,7 +1,7 @@
 import torch
 #from adversarial import get_adversarial_attack
 
-def search_u_v(conf, model, cache=None, plot=False, path=""):
+def search_u_v(conf, model, cache):
     init = cache['init']
     num = init.shape[0] // 2
     u = init[:num]
@@ -25,7 +25,8 @@ def search_u_v(conf, model, cache=None, plot=False, path=""):
 
     cache["idx"] = highest_loss_idx
     cache["lr"] = lr
-    return u, v, cache
+    cache['init'] = torch.cat((u, v)).detach()
+    return u, v
 
 
 
@@ -101,4 +102,3 @@ def u_v_init(conf, reg_loader, cache):
 def get_reg_batch(conf, iterator):
     data, target = next(iterator)
     return data.to(conf.device), target.to(conf.device)
-
