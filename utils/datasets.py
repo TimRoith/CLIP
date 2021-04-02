@@ -68,7 +68,7 @@ def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1
         test, _ = torch.utils.data.random_split(test, [test_count, _count])
 
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
-    valid_loader = DataLoader(val, batch_size=1000, shuffle=False, pin_memory=True, num_workers=num_workers)
+    valid_loader = DataLoader(val, batch_size=1000, shuffle=True, pin_memory=True, num_workers=num_workers)
     test_loader = DataLoader(test, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
 
     return train_loader, valid_loader, test_loader
