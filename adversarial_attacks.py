@@ -6,7 +6,7 @@ class attack:
 # No attack     
 class no_attack(attack):
     #
-    def __call__(self, x, y):
+    def __call__(self, model, x, y):
         return x
 
 
@@ -115,7 +115,9 @@ class pgd(attack):
                 delta.grad.zero_()
         return torch.clamp(x + delta.detach(), self.x_min, self.x_max)
                     
-                
+
+
+                    
 def clamp(x, x_min, x_max):
     return torch.max(torch.min(x, x_max), x_min)
                     
