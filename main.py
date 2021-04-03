@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # Set up variable and data for an example
 # -----------------------------------------------------------------------------------
 # specify the path of your data
-data_file = "../Bregman/data"
+data_file = "/"
 
 # load up configuration from examples
 # conf = cf.plain_example(data_file, use_cuda=True)
