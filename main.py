@@ -14,10 +14,11 @@ import matplotlib.pyplot as plt
 # Set up variable and data for an example
 # -----------------------------------------------------------------------------------
 # specify the path of your data
-data_file = "/"
+data_file = "../Bregman/data"
 
 # load up configuration from examples
-conf = cf.pgd_example(data_file, use_cuda=True)
+# conf = cf.plain_example(data_file, use_cuda=True)
+conf = cf.clip_example(data_file, use_cuda=True)
 
 # get train, validation and test loader
 train_loader, valid_loader, test_loader = get_data_set(conf)
@@ -26,8 +27,9 @@ train_loader, valid_loader, test_loader = get_data_set(conf)
 # -----------------------------------------------------------------------------------
 # define the model and an instance of the best model class
 # -----------------------------------------------------------------------------------
-model = models.fully_connected([784, 64, 64, 10], conf.activation_function).to(conf.device)
-best_model = train.best_model(models.fully_connected([784, 64, 64, 10], conf.activation_function).to(conf.device))
+sizes = [784, 200, 80, 10]
+model = models.fully_connected(sizes, conf.activation_function).to(conf.device)
+best_model = train.best_model(models.fully_connected(sizes, conf.activation_function).to(conf.device), goal_acc = conf.goal_acc)
 
 # -----------------------------------------------------------------------------------
 # Initialize optimizer and lamda scheduler
@@ -44,6 +46,8 @@ history = {key: [] for key in tracked}
 # -----------------------------------------------------------------------------------
 # cache for the lipschitz update
 cache = {'counter':0}
+
+
 
 print("Train model: {}".format(conf.model))
 for i in range(conf.epochs):
@@ -69,3 +73,11 @@ for i in range(conf.epochs):
     
     # ------------------------------------------------------------------------
     lamda_scheduler(conf, train_data['train_acc'])
+    best_model(train_data['train_acc'], val_data['val_acc'], model=model)
+    
+
+# -----------------------------------------------------------------------------------
+# Test the model afterwards
+# -----------------------------------------------------------------------------------
+conf.attack.attack_iters=100
+test_data = train.test_step(conf, best_model.best_model, test_loader, attack=conf.attack)
