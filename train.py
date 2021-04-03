@@ -12,6 +12,10 @@ def train_step(conf, model, opt, train_loader, lip_loader, cache, verbosity = 1)
     tot_steps = 0
     train_lip_loss = 0.0
     
+    # 
+    u = None
+    v = None
+    
     # define the set XLip as cycle
     if  not lip_loader is None:
         lip_cycle = cycle(lip_loader)
@@ -161,7 +165,7 @@ def test_step(conf, model, test_loader, attack = None, verbosity = 1):
 
 class best_model:
     '''saves the best model'''
-    def __init__(self, best_model=None, gamma = 0.0):
+    def __init__(self, best_model=None, gamma = 0.0, goal_acc = 0.0):
         # stores best seen score and model
         self.best_score = 0.0
         
@@ -170,10 +174,11 @@ class best_model:
 
         # score function
         def score_fun(train_acc, test_acc):
-            return gamma * train_acc + (1-gamma) * test_acc
+            return gamma * train_acc + (1-gamma) * test_acc + (train_acc > goal_acc)
         self.score_fun = score_fun
+        
     
-    def __call__(train_acc, val_acc, model=None):
+    def __call__(self, train_acc, val_acc, model=None):
         # evaluate score
         score = self.score_fun(train_acc, val_acc)
         if score >= self.best_score:
