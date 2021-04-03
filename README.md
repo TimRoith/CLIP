@@ -11,6 +11,11 @@ Feel free to use it and please refer to our paper when doing so.
       primaryClass={cs.LG}
 }
 ```
+## Benchmarks
+
+| Regularization | Clean           | PGD      |
+| -------------- | --------------- | -------- |
+| None           |                 |          |
 
 ## Method Description
 The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. For a neural network 
