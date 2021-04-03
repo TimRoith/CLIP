@@ -13,7 +13,7 @@ Feel free to use it and please refer to our paper when doing so.
 ```
 ## Benchmarks
 
-| Regularization    | Clean        | PGD       |
+| Regularization    | Clean        | PGD-L2    |
 | ----------------- | -------------| --------- |
 | None              | 97.07 %      | 60.1 %    |
 | CLIP95, lamda=0.1 | 98.0 %       | 76.7 %    |
