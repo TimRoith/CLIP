@@ -47,7 +47,7 @@ In the algorithm we approximate this constant via difference quotients on a fini
       <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathcal{X}_{\mathrm{Lip}}\subset\mathcal{X}\times\mathcal{X}." title="Lipschitz Constant" />
 </p>
 
-In order to ensure that the tuples in this set correspond to point with that realize a high difference qoutient the set is updated iteratively 
+In order to ensure that the tuples in this set correspond to point with that realize a high difference quotient the set is updated iteratively 
 via a gradient ascent scheme.
 
 
@@ -62,7 +62,7 @@ Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 You can specify the following options for the regularizer:
 * ```conf_arg['regularization']```: Specifies which regularization to use:
     * ```"global_lipschitz"```: activates the CLIP reguarization as described above (Default),
-    * ```"none"```: decativates any kind of additional regularization.
+    * ```"none"```: deactivates any kind of additional regularization.
 * ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
 * ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
 * ```conf_arg['reg_interval']```: Specifies in which interval the regularization is applied, default: ```reg_interval=1```.
