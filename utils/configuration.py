@@ -12,6 +12,8 @@ class Conf:
         
         # dataset
         self.data_set = kwargs.get('data_set', "MNIST")
+        self.data_set_mean = 0.0
+        self.data_set_std = 1.0
         self.data_file = kwargs.get('data_file', "data")
         self.train_split = kwargs.get('train_split', 0.9)
         self.im_shape = None
@@ -88,7 +90,7 @@ def plain_example(data_file, use_cuda=False, num_workers=None):
     conf = Conf(**conf_args)
     
     # set attack
-    conf.attack = at.pgd(conf.loss, epsilon=10.0, x_min=conf.x_min,x_max=conf.x_max)
+    conf.attack = at.pgd(conf.loss, epsilon=2.0, x_min=conf.x_min,x_max=conf.x_max)
     return conf
 
 # -----------------------------
@@ -108,5 +110,6 @@ def clip_example(data_file, use_cuda=False, num_workers=None):
     conf = Conf(**conf_args)
     
     # set attack
-    conf.attack = at.pgd(conf.loss, epsilon=10.0, x_min=conf.x_min,x_max=conf.x_max)
+    conf.attack = at.pgd(conf.loss, epsilon=2.0, x_min=conf.x_min,x_max=conf.x_max)
     return conf
+            
