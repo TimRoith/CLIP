@@ -111,7 +111,7 @@ The model is then loaded via
 model = models.fully_connected([784, 400, 200, 10], conf.activation_function)
 model.to(conf.device)
 ```
-where ```[784, 400, 200, 10]``` denotes the layer dimesnions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```.
+where ```[784, 400, 200, 10]``` denotes the layer dimensions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```.
 
 ## References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
