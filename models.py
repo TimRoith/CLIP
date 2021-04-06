@@ -27,10 +27,12 @@ def get_activation_function(activation_function):
     return af
     
 class fully_connected(nn.Module):
-    def __init__(self, sizes, act_fun):
+    def __init__(self, sizes, act_fun, mean = 0.0, std = 1.0):
         super(fully_connected, self).__init__()
         
         self.act_fn = get_activation_function(act_fun)
+        self.mean = mean
+        self.std = std
         
         layer_list = [Flatten()]
         for i in range(len(sizes)-1):
@@ -41,5 +43,6 @@ class fully_connected(nn.Module):
         
         
     def forward(self, x):
+        x = (x - self.mean)/self.std
         return self.layers(x)
 
