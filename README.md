@@ -15,10 +15,10 @@ Feel free to use it and please refer to our paper when doing so.
 
 | Regularization    | Clean        | PGD-L2    |
 | ----------------- | -------------| --------- |
-| None              | 97.07 %      | 60.1 %    |
-| CLIP95            | 98.0 %       | 80.3 %    |
+| None              | 97.07 %      | 31.2 %    |
+| CLIP95            | 98.1 %       | 71.5 %    |
 
-The table above shows the accuracy of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under adversarial attacks. 
+The table above shows the accuracy of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under adversarial attacks. We allow attacks to have a maximum L2-distance of 2.0. 
 The runs can be reproduced with the configurations below.
 
 ## Method Description
