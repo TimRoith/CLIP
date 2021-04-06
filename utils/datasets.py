@@ -9,6 +9,10 @@ def get_data_set(conf, test_size=1):
     train, valid, test, train_loader, valid_loader, test_loader = [None] * 6
     if conf.data_set == "MNIST":
         conf.im_shape = [1,28,28]
+        
+        # set mean and std for this dataset
+        conf.data_set_mean = 0.1307
+        conf.data_set_std = 0.3081
         train, test = get_mnist(conf)
     elif conf.data_set == "Fashion-MNIST":
         conf.im_shape = [3,28,28]
@@ -39,18 +43,6 @@ def get_fashion_mnist(file):
 def get_transform(conf, channels, size, train):
     t = []
     t.append(transforms.ToTensor())
-    
-    # normalization for MNIST
-    if conf.data_set == "MNIST":
-        # mean and std
-        mean = 0.1307
-        std = 0.3081
-        # update limits
-        conf.x_min = (conf.x_min-mean)/std
-        conf.x_max = (conf.x_max-mean)/std
-        # add normalize to the transform
-        t.append(transforms.Normalize((mean,), (std,))),
-    
     # compose the transform
     transform = transforms.Compose(t)
     return transform
