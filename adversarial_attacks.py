@@ -81,18 +81,22 @@ class pgd(attack):
             
           
     def __call__(self, model, x, y):
-        delta_init = get_delta(x, self.epsilon, uniform=True)
-        
+        # initilaize delta
+        delta = get_delta(x, self.epsilon, uniform=True)
         if self.norm_type == "l2":
-            delta_init = delta_init / torch.norm(delta_init.view(delta_init.shape[0], -1), p=2, dim=1).view(delta_init.shape[0], 1, 1, 1) * self.epsilon
+            delta = delta / torch.norm(delta.view(delta.shape[0], -1), p=2, dim=1).view(delta.shape[0], 1, 1, 1) * self.epsilon
         
-        delta = delta_init.clone()
         index = torch.arange(0, x.shape[0], dtype=torch.long)
         # Restarting the attack to prevent getting stuck
         for i in range(self.restarts):
             delta.requires_grad = True
+            
+            # restart get new delta
             if i > 0:
-                delta.data[index] = delta_init[index]
+                delta = get_delta(x, self.epsilon, uniform=True)
+                if self.norm_type == "l2":
+                    delta = delta / torch.norm(delta.view(delta.shape[0], -1), p=2, dim=1).view(delta.shape[0], 1, 1, 1) * self.epsilon
+                delta.data[index] = delta[index]
 
             for _ in range(self.attack_iters):
                 pred = model(x + delta)
@@ -108,7 +112,7 @@ class pgd(attack):
                     d = torch.clamp(delta + self.alpha * torch.sign(grad), -self.epsilon, self.epsilon)
                 else:
                     d = delta + self.alpha * torch.sign(grad)
-                    # d = clamp(d, self.x_min - x, self.x_max - x)
+                    d = clamp(d, self.x_min - x, self.x_max - x)
                     d = d / torch.norm(d.view(d.shape[0], -1), p=2, dim=1).view(d.shape[0], 1, 1, 1) * self.epsilon
                 #
                 delta.data[index] = d[index]
