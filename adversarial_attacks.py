@@ -13,13 +13,15 @@ class no_attack(attack):
 
 # get gauss noise augmentation. Magnitude is dependent on noise level
 class gauss_attack(attack):
-    def __init__(self, nl=1.0):
+    def __init__(self, nl=1.0, x_min=0.0, x_max=1.0):
         super(gauss_attack, self).__init__()
         self.nl = nl
+        self.x_min = x_min
+        self.x_max = x_max
     
     #
     def __call__(self, model, x, y):
-        return x+torch.randn_like(x) * self.nl
+        return torch.clamp(x+torch.randn_like(x) * self.nl, min=self.x_min, max=self.x_max)
 
     
 # fgsm attack
