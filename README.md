@@ -16,7 +16,8 @@ Feel free to use it and please refer to our paper when doing so.
 | Regularization    | Clean        | Noise    | PGD-L2(epsilon = 2.0) |
 | ----------------- | -------------| -------- | --------------------- |
 | None              | 97.07        | **34.5** | 31.2                  |
-| CLIP95            | **98.1**     | 29.6     | **71.5**              |
+| CLIP95            | 91.4         | 34.4     | 71.4                  |
+| CLIP99            | **98.1**     | 29.6     | **71.5**              |
 
 The table above shows the accuracy in [%] of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under different adversarial attacks.
 The runs can be reproduced with the configurations below.
