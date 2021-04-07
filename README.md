@@ -13,12 +13,12 @@ Feel free to use it and please refer to our paper when doing so.
 ```
 ## Benchmarks
 
-| Regularization    | Clean        | PGD-L2(epsilon = 2.0) |
-| ----------------- | -------------| --------------------- |
-| None              | 97.07 %      | 31.2 %                |
-| CLIP95            | 98.1 %       | 71.5 %                |
+| Regularization    | Clean        | Noise    | PGD-L2(epsilon = 2.0) |
+| ----------------- | -------------| -------- | --------------------- |
+| None              | 97.07        | **34.5** | 31.2                  |
+| CLIP95            | **98.1**     | 29.6     | **71.5**              |
 
-The table above shows the accuracy of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under adversarial attacks.
+The table above shows the accuracy in [%] of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under different adversarial attacks.
 The runs can be reproduced with the configurations below.
 
 ## Method Description
