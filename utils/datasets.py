@@ -15,7 +15,10 @@ def get_data_set(conf, test_size=1):
         conf.data_set_std = 0.3081
         train, test = get_mnist(conf)
     elif conf.data_set == "Fashion-MNIST":
-        conf.im_shape = [3,28,28]
+        conf.data_set_mean = 0.5
+        conf.data_set_std = 0.5
+        
+        conf.im_shape = [1,28,28]
         train, test = get_fashion_mnist(conf.data_file)
     else:
         raise ValueError("Dataset:" + conf.data_set + " not defined")
