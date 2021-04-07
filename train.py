@@ -205,7 +205,7 @@ class lamda_scheduler:
         self.cooldown_val = cooldown
         self.cooldown = cooldown
          
-    def __call__(self, conf, train_acc):
+    def __call__(self, conf, train_acc, verbosity = 1):
         # check if we are still in the warm up phase
         if self.warmup > 0:
             self.warmup -= 1
@@ -224,4 +224,7 @@ class lamda_scheduler:
                 if train_acc > conf.goal_acc:
                     conf.lamda += conf.lamda_increment
                 else:
-                    conf.lamda -= conf.lamda_increment
+                    conf.lamda = max(conf.lamda - conf.lamda_increment,0.0)
+                    
+        if verbosity > 0:
+            print('Lamda was set to:', conf.lamda)
