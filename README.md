@@ -19,7 +19,8 @@ Feel free to use it and please refer to our paper when doing so.
 | CLIP95            | 91.4         | 34.4      | 71.4                  |
 | CLIP97            | 97.0         | **34.6**  | **72.4**              |
 
-The table above shows the accuracy in [%] of a model for the MNIST dataset. We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under different adversarial attacks.
+The table above shows the accuracy in [%] for a fully connected model (two hidden layers with 200 and 80 neurons) for the MNIST dataset. 
+We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under different adversarial attacks.
 The runs can be reproduced with the configurations below.
 
 ## Method Description
