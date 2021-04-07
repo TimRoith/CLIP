@@ -16,7 +16,7 @@ Feel free to use it and please refer to our paper when doing so.
 | Regularization    | Clean        | Noise     | PGD-L2(epsilon = 2.0) |
 | ----------------- | -------------| --------- | --------------------- |
 | None              | **97.1**     | 34.5      | 31.2                  |
-| CLIP95            | 91.4         | 34.4      | 71.4                  |
+| CLIP95            | 96.4         | 29.8      | 71.4                  |
 | CLIP97            | 97.0         | **34.6**  | **72.4**              |
 
 The table above shows the accuracy in [%] for a fully connected model (two hidden layers with 200 and 80 neurons) for the MNIST dataset. 
