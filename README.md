@@ -13,7 +13,7 @@ Feel free to use it and please refer to our paper when doing so.
 ```
 ## Benchmarks
 
-| Regularization    | Clean        | Noise     | PGD-L2(epsilon = 2.0) |
+| Regularization    | Clean        | Noise     | PGD-L2 (epsilon = 2.0) |
 | ----------------- | -------------| --------- | --------------------- |
 | None              | **97.1**     | 34.5      | 31.2                  |
 | CLIP95            | 96.4         | 29.8      | 71.4                  |
