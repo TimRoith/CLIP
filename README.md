@@ -39,7 +39,7 @@ where
 * <img src="https://latex.codecogs.com/svg.latex?\mathcal{T}=\{(x_i,y_i)\}_{i=1}^N\subset\mathcal{X}\times\mathcal{Y}" title="training set"/> denotes the training set, 
 * <img src="https://latex.codecogs.com/svg.latex?l(\cdot,\cdot)" title="loss"/> denotes a loss function.
 
-The Lipschitz constant of the net w.r.t. to the input space variable is defined as
+The Lipschitz constant of the net w.r.t. the input space variable is defined as
 <p align="center">
       <img src="https://latex.codecogs.com/svg.latex?\Large&space;\mathrm{Lip}(f_\theta)=\sup_{x,x^\prime\in\mathcal{X}}\frac{|f_\theta(x)-f_\theta(x^\prime)|}{|x-x^\prime|}." title="Lipschitz Constant" />
 </p>
@@ -63,7 +63,7 @@ Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### Regularization
 You can specify the following options for the regularizer:
 * ```conf_arg['regularization']```: Specifies which regularization to use:
-    * ```"global_lipschitz"```: activates the CLIP reguarization as described above (Default),
+    * ```"global_lipschitz"```: activates the CLIP regularization as described above (Default),
     * ```"none"```: deactivates any kind of additional regularization.
 * ```conf_arg['reg_iters']```: The number of gradient ascent steps for the Lipschitz set update, default: ```reg_iters=1```.
 * ```conf_arg['reg_lr']```: Step size for the gradient ascent scheme, default: ```reg_lr=1.0```.
@@ -97,13 +97,13 @@ The dataloaders are then created by
 ```
 train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
 ```
-Note: The ```download``` flags for the torchvision dataset methods are all set to ```False```. You can easily subsitute this by your other dataloaders as long 
+Note: The ```download``` flags for the torchvision dataset methods are all set to ```False```. You can easily substitute this by your other dataloaders as long 
 the three loaders ```train_loader, valid_loader, test_loader``` are specified.
 
 ### Model
 The example loads a simple fully connected net from the file ```model.py```.
 * ```conf_arg['model']```: Specifies the model that should be loaded from ```model.py```.
-    * ```"fc"``` (Dafault, fully connected model, currently only possibility).
+    * ```"fc"``` (Default, fully connected model, currently only possibility).
 * ```conf_arg['activation_function']```: Specifies the activation function for the net.
     * ```"ReLU"``` (Default),
     * ```"sigmoid"```.
