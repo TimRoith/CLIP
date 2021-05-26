@@ -1,4 +1,4 @@
-# CLIP
+# 📈 CLIP
 Implementation of the *CLIP* algorithm for Lipschitz regularization of neural networks, proposed in **CLIP: Cheap Lipschitz Training of Neuronal Networks** [[1]](#1).
 Feel free to use it and please refer to our paper when doing so.
 ```
@@ -11,7 +11,7 @@ Feel free to use it and please refer to our paper when doing so.
       primaryClass={cs.LG}
 }
 ```
-## Benchmarks
+## :heavy_check_mark: Benchmarks
 
 | Regularization    | Clean        | Noise     | PGD-L2 (epsilon = 2.0) |
 | ----------------- | -------------| --------- | --------------------- |
@@ -23,7 +23,7 @@ The table above shows the accuracy in [%] for a fully connected model (two hidde
 We evaluate the accuracy (averaged over 3 runs) on the clean test set and the accuracy under different adversarial attacks.
 The runs can be reproduced with the configurations below.
 
-## Method Description
+## 💡 Method Description
 The CLIP Algorithm proposes a regularization for controlling the Lipschitz constant of a neural network. For a neural network 
 <p align="center">
       <img src="https://latex.codecogs.com/svg.latex?\Large&space;f_\theta:\mathcal{X}\rightarrow\mathcal{Y}" title="net"/> 
@@ -54,7 +54,7 @@ via a gradient ascent scheme.
 
 
 
-## Usage
+## :wrench: Usage
 Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
 Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
 ### CUDA Settings
@@ -115,7 +115,7 @@ model.to(conf.device)
 ```
 where ```[784, 400, 200, 10]``` denotes the layer dimensions. Alternatively, you can use an arbitrary PyTorch model, i.e., a subclass of ```nn.Module```.
 
-## References
+## 📝 References
 <a id="1">[1]</a> Leon Bungert, René Raab, Tim Roith, Leo Schwinn, Daniel Tenbrinck. "CLIP: Cheap Lipschitz Training of Neuronal Networks." arXiv preprint arXiv:2103.12531 (2021). https://arxiv.org/abs/2103.12531
 
 <a id="2">[2]</a> The Pytorch website https://pytorch.org/, see also their git https://github.com/pytorch/pytorch
