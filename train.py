@@ -199,7 +199,8 @@ class lamda_scheduler:
         self.warmup_lamda = warmup_lamda
         
         # save real lamda
-        self.lamda = conf.lamda
+        self.lamda = conf.lamda        
+        conf.lamda = warmup_lamda
         
         # cooldown
         self.cooldown_val = cooldown
