@@ -56,7 +56,10 @@ via a gradient ascent scheme.
 
 ## :wrench: Usage
 Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
-Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
+Therein the dictionary ```conf_arg``` specifies the configuration of a run.
+The specification ```conf = cf.plain_example(data_file, use_cuda=False, download=False)``` will train an unregularized network, whereas ```conf = cf.clip_example(data_file, use_cuda=False, download=False)``` utilizes our algorithm.
+Executing ```main.py``` will throw an error if the dataset is not available. You can change ```download=False``` to ```download=True``` for automatically downloading the dataset.
+
 ### CUDA Settings
 * ```conf_arg['use_cuda']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
 
