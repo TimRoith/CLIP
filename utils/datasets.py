@@ -30,16 +30,16 @@ def get_data_set(conf, test_size=1):
 def get_mnist(conf):
     transform = get_transform(conf, 1, 28, True)
     #
-    train = datasets.MNIST(conf.data_file, train=True, download=False, transform=transform)
-    test = datasets.MNIST(conf.data_file, train=False, download=False, transform=transform)
+    train = datasets.MNIST(conf.data_file, train=True, download=conf.download, transform=transform)
+    test = datasets.MNIST(conf.data_file, train=False, download=conf.download, transform=transform)
     return train, test
 
 def get_fashion_mnist(file):
     transform_train = get_transform("FashionMNIST", 1, 28, True)
     transforms_test = get_transform("FashionMNIST", 1, 28, False)
 
-    train = datasets.FashionMNIST(file, train=True, download=False,transform=transform_train)
-    test = datasets.FashionMNIST(file, train=False, download=False, transform=transforms_test)
+    train = datasets.FashionMNIST(file, train=True, download=conf.download,transform=transform_train)
+    test = datasets.FashionMNIST(file, train=False, download=conf.download, transform=transforms_test)
     return train, test
 
 

@@ -3,12 +3,6 @@ import utils.configuration as cf
 from utils.datasets import get_data_set
 import models
 import train
-import adversarial_attacks as at
-
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
-import matplotlib.pyplot as plt
 
 # -----------------------------------------------------------------------------------
 # Set up variable and data for an example
@@ -17,8 +11,8 @@ import matplotlib.pyplot as plt
 data_file = "/"
 
 # load up configuration from examples
-# conf = cf.plain_example(data_file, use_cuda=True)
-conf = cf.clip_example(data_file, use_cuda=True)
+# conf = cf.plain_example(data_file, use_cuda=False, download=False)
+conf = cf.clip_example(data_file, use_cuda=False, download=False)
 
 # get train, validation and test loader
 train_loader, valid_loader, test_loader = get_data_set(conf)
@@ -34,7 +28,7 @@ best_model = train.best_model(models.fully_connected(sizes, conf.activation_func
 # -----------------------------------------------------------------------------------
 # Initialize optimizer and lamda scheduler
 # -----------------------------------------------------------------------------------
-opt = torch.optim.SGD(model.parameters(), lr = 0.1, momentum =0.9)
+opt = torch.optim.SGD(model.parameters(), lr = 0.1, momentum = 0.9)
 lamda_scheduler = train.lamda_scheduler(conf, warmup = 5, warmup_lamda = 0.0, cooldown = 1)
 # -----------------------------------------------------------------------------------
 

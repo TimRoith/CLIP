@@ -16,6 +16,7 @@ class Conf:
         self.data_set_std = 1.0
         self.data_file = kwargs.get('data_file', "data")
         self.train_split = kwargs.get('train_split', 0.9)
+        self.download = False
         self.im_shape = None
         self.x_min = 0.0
         self.x_max = 1.0
@@ -77,14 +78,17 @@ class Conf:
 # -----------------------------
 # no regularization
 # -----------------------------
-def plain_example(data_file, use_cuda=False, num_workers=None):
+def plain_example(data_file, use_cuda=False, num_workers=None, download=False):
     if use_cuda and num_workers is None:
         num_workers = 4
     else:
         num_workers = 0
     
-    conf_args = {'lamda':0.0,'data_file':data_file, 'use_cuda':use_cuda, 'train_split':0.9, 'num_workers':num_workers,
-                 'regularization': "none", 'activation_function':"sigmoid"}
+    conf_args = {'lamda':0.0,\
+                 'data_file':data_file, 'download':download, 'train_split':0.9,\
+                 'use_cuda':use_cuda, 'num_workers':num_workers,\
+                 'regularization':"none",\
+                 'activation_function':"sigmoid"}
 
     # get configuration
     conf = Conf(**conf_args)
@@ -96,15 +100,20 @@ def plain_example(data_file, use_cuda=False, num_workers=None):
 # -----------------------------
 # PDG L2 Attack
 # -----------------------------
-def clip_example(data_file, use_cuda=False, num_workers=None):
+def clip_example(data_file, use_cuda=False, num_workers=None, download=False):
     if use_cuda and num_workers is None:
         num_workers = 4
     else:
         num_workers = 0
     
-    conf_args = {'lamda':0.1,'data_file':data_file, 'use_cuda':use_cuda, 'train_split':0.9, 'num_workers':num_workers,
-                 'regularization': "global_lipschitz", 'reg_init': "partial_random",'reg_lr':10,
-                 'activation_function':"sigmoid", 'goal_acc': 0.95}
+    conf_args = {'lamda':0.1,\
+                 'data_file':data_file, 'download':download, 'train_split':0.9,\
+                 'use_cuda':use_cuda, 'num_workers':num_workers,\
+                 'regularization':"global_lipschitz",\
+                 'reg_init': "partial_random",\
+                 'reg_lr':10,\
+                 'activation_function':"sigmoid",\
+                 'goal_acc': 0.95}
 
     # get configuration
     conf = Conf(**conf_args)
