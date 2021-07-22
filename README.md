@@ -100,8 +100,7 @@ The dataloaders are then created by
 ```
 train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
 ```
-Note: The ```download``` flags for the torchvision dataset methods are all set to ```False```. You can easily substitute this by your other dataloaders as long 
-the three loaders ```train_loader, valid_loader, test_loader``` are specified.
+Note: The ```download``` flags for the torchvision dataset methods are all set to ```False``` by default and can be set to ```True``` in the ```main.py```script as described above. You can easily substitute this by your other dataloaders as long the three loaders ```train_loader, valid_loader, test_loader``` are specified.
 
 ### Model
 The example loads a simple fully connected net from the file ```model.py```.
