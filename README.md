@@ -56,7 +56,10 @@ via a gradient ascent scheme.
 
 ## :wrench: Usage
 Our code is implemented Python and utilizes PyTorch [[2]](#2). An example how to use the code is provided in the file ```main.py```. 
-Therein the dictionary ```conf_arg``` specifies the cofiguration of a run.
+Therein the dictionary ```conf_arg``` specifies the configuration of a run.
+The specification ```conf = cf.plain_example(data_file, use_cuda=False, download=False)``` will train an unregularized network, whereas ```conf = cf.clip_example(data_file, use_cuda=False, download=False)``` utilizes our algorithm.
+Executing ```main.py``` will throw an error if the dataset is not available. You can change ```download=False``` to ```download=True``` for automatically downloading the dataset.
+
 ### CUDA Settings
 * ```conf_arg['use_cuda']```: Boolean that specifies wether the model should be trained on the CPU, default: ```False```.
 
@@ -97,8 +100,7 @@ The dataloaders are then created by
 ```
 train_loader, valid_loader, test_loader = get_data_set(conf.dataset, conf.data_file, conf.batch_size)
 ```
-Note: The ```download``` flags for the torchvision dataset methods are all set to ```False```. You can easily substitute this by your other dataloaders as long 
-the three loaders ```train_loader, valid_loader, test_loader``` are specified.
+Note: The ```download``` flags for the torchvision dataset methods are all set to ```False``` by default and can be set to ```True``` in the ```main.py```script as described above. You can easily substitute this by your other dataloaders as long the three loaders ```train_loader, valid_loader, test_loader``` are specified.
 
 ### Model
 The example loads a simple fully connected net from the file ```model.py```.
