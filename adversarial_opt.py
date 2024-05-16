@@ -23,7 +23,7 @@ class lip_constant_estimate:
         self.in_norm = in_norm if in_norm is not None else l2_norm
         self.mean = mean
 
-    def __call__(self, u, v)
+    def __call__(self, u, v):
         uv = torch.cat((u, v), 0)
         num = uv.shape[0] // 2
         output = self.model(uv)
