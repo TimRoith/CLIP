@@ -1,5 +1,5 @@
 import torch
-import math
+import mathplotlib.pyplot as plt
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
@@ -121,3 +121,26 @@ class adverserial_nesterov_accelerated:
         #v.data = torch.clamp(v.data, 0., 1.)
         loss_best = loss_best * (1 - mask).squeeze() + loss_tmp.detach() * mask.squeeze()
         return loss_best
+    
+class plotting_adversarial_update:
+    def __init__(self, model, x_min, x_max, adv_iters=10, type="gradient_ascent"):
+        self.model = model
+        self.space = torch.linspace(x_min, x_max, 1000).to(model.device)
+        self.adv_iters = adv_iters
+        self.type = type
+
+    def set_uv(self, u, v):
+        if self.type == "gradient_ascent":
+            adv = adversarial_gradient_ascent(self.model, u, v)
+        elif self.type == "nesterov_accelerated":
+            adv = adverserial_nesterov_accelerated(self.model, u, v)
+        else:
+            raise ValueError("type should be either gradient_ascent or nesterov_accelerated")
+        for _ in range(self.adv_iters):
+            adv.step()
+        return adv.u, adv.v
+    
+    def first_plot(self):
+        plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
+        plt.show()
+    
