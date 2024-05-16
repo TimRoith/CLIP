@@ -1,4 +1,5 @@
 import torch
+import math
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
@@ -44,6 +45,7 @@ class adversarial_gradient_ascent:
         reg_init = "partial_random"):
 
         self.lr = lr
+        self.lr_decay = lr_decay
         self.lip_constant_estimate = lip_constant_estimate(model)
         self.reg_init = reg_init
 
@@ -70,3 +72,52 @@ class adversarial_gradient_ascent:
         # v.data = torch.clamp(v.data, 0., 1.)
 
         # loss_best = loss_best * (1 - mask).squeeze() + loss_tmp.detach() * mask.squeeze()
+
+class adverserial_nesterov_accelerated:
+    def __init__(self,
+        model,
+        u, v,
+        lr = 0.1,
+        lr_decay = .95,
+        reg_init = "partial_random"):
+
+        self.lr = lr
+        self.lr_decay = lr_decay
+        self.lip_constant_estimate = lip_constant_estimate(model)
+        self.reg_init = reg_init
+        self.u = u
+        self.v = v
+
+        self.alpha = torch.zeros(len(u)).to(u.device)
+        self.updated_grad_uv = torch.cat((u, v)).detach() # this needs to be the initial value of the uv
+
+    def step(self,):
+        loss = self.lip_constant_estimate(self.u, self.v)
+        loss_sum = torch.sum(loss)
+        loss_sum.backward()
+
+        u_grad = self.u.grad.detach()
+        u_futur = self.u.data + self.lr * u_grad
+        self.u.grad.zero_()
+        v_grad = self.v.grad.detach()
+        v_futur = self.v.data + self.lr * v_grad
+        self.v.grad.zero_()
+        alpha_next = (1 + torch.sqrt(1 + 4 * self.alpha ** 2)) / 2
+        gamma = (1 - self.alpha) / (alpha_next)
+
+
+        u_tmp = (1 - gamma) * u_futur + gamma * self.updated_grad_uv[:u_futur.shape[0]]
+        v_tmp = (1 - gamma) * v_futur + gamma * self.updated_grad_uv[u_futur.shape[0]:]
+
+        loss_tmp = self.lip_constant_estimate(u_tmp, v_tmp)
+        mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
+        self.u.data = u_tmp * mask + self.u.data * (1 - mask)
+        self.v.data = v_tmp * mask + self.v.data * (1 - mask)
+
+        lr = (lr / self.reg_decay * (1 - mask)) + (lr * self.reg_decay * mask)
+        self.alpha = alpha_next * mask + self.alpha * (1 - mask)
+        self.updated_grad_uv = torch.cat((self.u, self.v)).detach() * torch.cat((mask, mask)) + self.updated_grad_uv * (1 - torch.cat((mask, mask)))
+        #u.data = torch.clamp(u.data, 0., 1.)
+        #v.data = torch.clamp(v.data, 0., 1.)
+        loss_best = loss_best * (1 - mask).squeeze() + loss_tmp.detach() * mask.squeeze()
+        return loss_best
