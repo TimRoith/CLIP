@@ -1,8 +1,13 @@
 import torch
-import mathplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import torch.nn as nn
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
 
 def get_reg_batch(conf, iterator):
     data, target = next(iterator)
@@ -143,4 +148,38 @@ class plotting_adversarial_update:
     def first_plot(self):
         plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
         plt.show()
+
+class fully_connected(nn.Module):
+    def __init__(self, sizes, act_fun, mean = 0.0, std = 1.0):
+        super(fully_connected, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.act_fn = get_activation_function(act_fun)
+        self.mean = mean
+        self.std = std
+        
+        layer_list = [Flatten()]
+        for i in range(len(sizes)-1):
+            layer_list.append(nn.Linear(sizes[i], sizes[i+1]))
+            layer_list.append(self.act_fn())
+            
+        self.layers = nn.Sequential(*layer_list)
+        
+        
+    def forward(self, x):
+        x = (x - self.mean)/self.std
+        return self.layers(x)
     
+def get_activation_function(activation_function):
+    af = None
+    if activation_function == "ReLU":
+        af = nn.ReLU
+    elif activation_function == "sigmoid":
+        af = nn.Sigmoid
+    else:
+        af = nn.ReLU
+    return af
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = fully_connected([1, 20, 1], "ReLU")
+model = model.to(device)
+plotting_adversarial_update(model, -1, 1).first_plot()
