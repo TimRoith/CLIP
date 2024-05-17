@@ -26,12 +26,13 @@ class Comparator:
             adv_values = torch.zeros(self.num_iters).to(self.device)
             for i in range(self.num_iters):
                 adv.step()
-                adv_values[i] = torch.sqrt(torch.square(self.true_lipschitz - self.lip_constant_estimate(adv.u, adv.v)))
+                lip_loss = torch.sqrt(torch.square( self.true_lipschitz - self.lip_constant_estimate(adv.u, adv.v)**0.5))
+                adv_values[i] = lip_loss
             self.values.append(adv_values)
 
     def plot(self):
         for i in range(len(self.list_name)):
-            plt.plot(self.values[i].cpu().detach(), label=self.list_name[i])
+            plt.plot(self.values[i].cpu().detach(), label=self.list_name[i], markersize=2*i+1)
         plt.legend()
         plt.show()
 
@@ -41,7 +42,7 @@ class GaussianModel(nn.Module):
         self.m = m
         self.sd = sd
         self.flatten = Flatten()
-        self.linear = nn.Linear(sizes[0], 1)
+        self.linear = nn.Linear(sizes[0], 1, bias=True)
         
     def forward(self, x):
         x = self.flatten(x)            # Step 1: Flatten the input
@@ -52,17 +53,26 @@ class GaussianModel(nn.Module):
         exp_result = torch.exp(-scaled_diff) # Step 6: Apply the negative sign and the exponential function
         return exp_result
     
+class BasicGaussianModel(nn.Module):
+    def __init__(self):
+        super(BasicGaussianModel, self).__init__()
+        
+    def forward(self, x):
+        diff_squared = x ** 2       
+        scaled_diff = - diff_squared / 2
+        exp_result = torch.exp(scaled_diff)
+        return exp_result
 
 sizes = [1]  # Example input size
 m = torch.tensor(0.0)  # Example mean value
 sd = torch.tensor(1.0)  # Example standard deviation
 
-model = GaussianModel(sizes, m, sd).to(device)
+model = BasicGaussianModel().to(device)
 
-u = torch.tensor([-2.5]*sizes[0]).to(device)
-v = torch.tensor([2.5]*sizes[0]).to(device)
-true_lipschitz = 1.0
+u = torch.tensor([-2.5]).to(device)
+v = torch.tensor([1.0]).to(device)
+true_lipschitz = torch.exp(-torch.tensor(1)/2).to(device)
 list_name = ['SGD', 'Adam'] # , 'RMSprop', 'Adagrad', 'Adadelta', 'AdamW', 'Adamax', 'ASGD', 'LBFGS
-comparator = Comparator(model, true_lipschitz, u, v, list_name, lr_list={'SGD':1, 'Adam':0.05})
+comparator = Comparator(model, true_lipschitz, u, v, list_name, lr_list={'SGD':0.5, 'Adam':0.05})
 comparator.compare()
 comparator.plot()
