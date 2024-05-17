@@ -158,9 +158,19 @@ class plotting_adversarial_update:
         plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
         plt.plot(u.cpu().detach(), self.model(u.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
         plt.plot(v.cpu().detach(), self.model(v.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
-        u_new, v_new = self.set_uv(u, v)
-        plt.plot(u_new.cpu().detach(), self.model(u_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
-        plt.plot(v_new.cpu().detach(), self.model(v_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
+        if self.type == "gradient_ascent":
+            adv = adversarial_gradient_ascent(self.model, u, v, lr=1)
+        elif self.type == "nesterov_accelerated":
+            adv = adverserial_nesterov_accelerated(self.model, u, v, lr=1)
+        else:
+            raise ValueError("adversarial_update" + self.type + " is unknown.")
+        for _ in range(self.adv_iters):
+            adv.step()
+            u_new = adv.u
+            v_new = adv.v
+            plt.plot(u_new.cpu().detach(), self.model(u_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
+            plt.plot(v_new.cpu().detach(), self.model(v_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
+            plt.pause(.2,)
         plt.show()
 
 class fully_connected(nn.Module):
@@ -201,6 +211,6 @@ for layer in model.layers:
         layer.weight.data = torch.randn(layer.weight.data.size())
         print(layer.weight.data)
 model = model.to(device)
-plotting = plotting_adversarial_update(model, -1, 1, type="nesterov_accelerated", adv_iters=1000)
+plotting = plotting_adversarial_update(model, -3, 3, adv_iters=100)
 #plotting.first_plot()
 plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
