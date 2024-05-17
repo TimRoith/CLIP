@@ -8,17 +8,17 @@ from adversarial_opt import fully_connected, adversarial_gradient_ascent, advers
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Comparator:
-    def __init__(self, model, lip_constant, u, v, list_name, lr =0.05, num_iters =1000):
+    def __init__(self, model, lip_constant, u, v, list_name, lr_list, num_iters =1000):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
         self.true_lipschitz = lip_constant
         self.u = u
         self.v = v
         self.list_name = list_name
-        self.lr = lr
+        self.lr_list = lr_list
         self.num_iters = num_iters
         self.lip_constant_estimate = lip_constant_estimate(model)
-        self.adv = [adversarial_update(self.model, self.u, self.v, opt_kwargs={'name':name, 'lr':self.lr}) for name in self.list_name]
+        self.adv = [adversarial_update(self.model, self.u, self.v, opt_kwargs={'name':name, 'lr':self.lr_list[name]}) for name in self.list_name]
         self.values = []
 
     def compare(self):
@@ -62,7 +62,7 @@ model = GaussianModel(sizes, m, sd).to(device)
 u = torch.tensor([-2.5]*sizes[0]).to(device)
 v = torch.tensor([2.5]*sizes[0]).to(device)
 true_lipschitz = 1.0
-list_name = ['Adam', 'SGD'] # , 'RMSprop', 'Adagrad', 'Adadelta', 'AdamW', 'Adamax', 'ASGD', 'LBFGS
-comparator = Comparator(model, true_lipschitz, u, v, list_name)
+list_name = ['SGD', 'Adam'] # , 'RMSprop', 'Adagrad', 'Adadelta', 'AdamW', 'Adamax', 'ASGD', 'LBFGS
+comparator = Comparator(model, true_lipschitz, u, v, list_name, lr_list={'SGD':1, 'Adam':0.05})
 comparator.compare()
 comparator.plot()
