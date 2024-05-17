@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
 from itertools import cycle
+from torch.optim import SGD, Adam
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
@@ -41,6 +42,41 @@ class lip_constant_estimate:
             return torch.mean(torch.square(loss))
         else:
             return torch.square(loss)
+        
+        
+        
+class adversarial_update:
+    def __init__(self, 
+               model,
+               u, v, 
+               opt_kwargs):
+        
+        self.lip_constant_estimate = lip_constant_estimate(model)
+        self.u = nn.Parameter(u)
+        self.v = nn.Parameter(v)
+        
+        opt_name = opt_kwargs.get('name', 'SGD')
+        if opt_name == 'SGD':
+            self.opt = SGD([self.u, self.v], 
+                           lr=opt_kwargs.get('lr', 0.1), 
+                           momentum=opt_kwargs.get('lr', 0.9))
+        elif opt_name == 'Adam':
+            self.opt = Adam([self.u, self.v], 
+                           lr=opt_kwargs.get('lr', 0.001),)
+        else:
+            raise ValueError('Unknown optimizer: ' + str(opt_kwargs['name']))
+        
+        
+    def step(self,):
+        self.opt.zero_grad()
+        
+        loss = self.lip_constant_estimate(self.u, self.v)
+        loss_sum = -torch.sum(loss)
+        loss_sum.backward()
+        
+        self.opt.step()
+        
+        
 
 class adversarial_gradient_ascent:
     def __init__(self,
