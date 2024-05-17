@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
 from itertools import cycle
+from torch.optim import SGD, Adam
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
@@ -41,6 +42,41 @@ class lip_constant_estimate:
             return torch.mean(torch.square(loss))
         else:
             return torch.square(loss)
+        
+        
+        
+class adversarial_update:
+    def __init__(self, 
+               model,
+               u, v, 
+               opt_kwargs):
+        
+        self.lip_constant_estimate = lip_constant_estimate(model)
+        self.u = nn.Parameter(u)
+        self.v = nn.Parameter(v)
+        
+        opt_name = opt_kwargs.get('name', 'SGD')
+        if opt_name == 'SGD':
+            self.opt = SGD([self.u, self.v], 
+                           lr=opt_kwargs.get('lr', 0.1), 
+                           momentum=opt_kwargs.get('lr', 0.9))
+        elif opt_name == 'Adam':
+            self.opt = Adam([self.u, self.v], 
+                           lr=opt_kwargs.get('lr', 0.001),)
+        else:
+            raise ValueError('Unknown optimizer: ' + str(opt_kwargs['name']))
+        
+        
+    def step(self,):
+        self.opt.zero_grad()
+        
+        loss = self.lip_constant_estimate(self.u, self.v)
+        loss_sum = -torch.sum(loss)
+        loss_sum.backward()
+        
+        self.opt.step()
+        
+        
 
 class adversarial_gradient_ascent:
     def __init__(self,
@@ -75,7 +111,7 @@ class adversarial_gradient_ascent:
         # mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
         # u.data = u_tmp * mask + u.data * (1 - mask)
         # v.data = v_tmp * mask + v.data * (1 - mask)
-        self.lr = (self.lr * self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
+        #self.lr = (self.lr * self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
         # u.data = torch.clamp(u.data, 0., 1.)
         # v.data = torch.clamp(v.data, 0., 1.)
         return loss_tmp
@@ -204,13 +240,14 @@ def get_activation_function(activation_function):
     return af
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = fully_connected([1, 20, 1], "sigmoid")
-for layer in model.layers:
-    if isinstance(layer, nn.Linear):
-        layer.weight.data = torch.randn(layer.weight.data.size())
-        print(layer.weight.data)
-model = model.to(device)
-plotting = plotting_adversarial_update(model, -3, 3, adv_iters=100)
-#plotting.first_plot()
-plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
+if __name__ == '__main__':
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = fully_connected([1, 20, 1], "sigmoid")
+    for layer in model.layers:
+        if isinstance(layer, nn.Linear):
+            layer.weight.data = torch.randn(layer.weight.data.size())
+            print(layer.weight.data)
+    model = model.to(device)
+    plotting = plotting_adversarial_update(model, -1, 1, type="nesterov_accelerated", adv_iters=1000)
+    #plotting.first_plot()
+    plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
