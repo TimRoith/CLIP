@@ -1,6 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
+from itertools import cycle
 
 def l2_norm(x):
     return torch.norm(x.view(x.shape[0], -1), p=2, dim=1)
@@ -58,6 +59,8 @@ class adversarial_gradient_ascent:
         self.v = v
 
     def step(self,):
+        self.u.requires_grad = True
+        self.v.requires_grad = True
         loss = self.lip_constant_estimate(self.u, self.v)
         loss_sum = torch.sum(loss)
         loss_sum.backward()
@@ -68,14 +71,14 @@ class adversarial_gradient_ascent:
             z.grad.zero_()
             z.data = z_tmp
 
-        # loss_tmp = lip_constant(conf, model, u_tmp, v_tmp)
+        loss_tmp = self.lip_constant_estimate(self.u, self.v)
         # mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
         # u.data = u_tmp * mask + u.data * (1 - mask)
         # v.data = v_tmp * mask + v.data * (1 - mask)
-        self.lr = (self.lr / self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
+        self.lr = (self.lr * self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
         # u.data = torch.clamp(u.data, 0., 1.)
         # v.data = torch.clamp(v.data, 0., 1.)
-
+        return loss_tmp
         # loss_best = loss_best * (1 - mask).squeeze() + loss_tmp.detach() * mask.squeeze()
 
 class adverserial_nesterov_accelerated:
@@ -97,6 +100,8 @@ class adverserial_nesterov_accelerated:
         self.updated_grad_uv = torch.cat((u, v)).detach() # this needs to be the initial value of the uv
 
     def step(self,):
+        self.u.requires_grad = True
+        self.v.requires_grad = True
         loss = self.lip_constant_estimate(self.u, self.v)
         loss_sum = torch.sum(loss)
         loss_sum.backward()
@@ -115,16 +120,16 @@ class adverserial_nesterov_accelerated:
         v_tmp = (1 - gamma) * v_futur + gamma * self.updated_grad_uv[u_futur.shape[0]:]
 
         loss_tmp = self.lip_constant_estimate(u_tmp, v_tmp)
-        mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
-        self.u.data = u_tmp * mask + self.u.data * (1 - mask)
-        self.v.data = v_tmp * mask + self.v.data * (1 - mask)
+        # mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
+        self.u.data = u_tmp #* mask + self.u.data * (1 - mask)
+        self.v.data = v_tmp #* mask + self.v.data * (1 - mask)
 
-        lr = (lr / self.reg_decay * (1 - mask)) + (lr * self.reg_decay * mask)
-        self.alpha = alpha_next * mask + self.alpha * (1 - mask)
-        self.updated_grad_uv = torch.cat((self.u, self.v)).detach() * torch.cat((mask, mask)) + self.updated_grad_uv * (1 - torch.cat((mask, mask)))
+        self.lr = (self.lr * self.lr_decay) # * mask + (lr / self.lr_decay * (1 - mask))
+        self.alpha = alpha_next #* mask + self.alpha * (1 - mask)
+        self.updated_grad_uv = torch.cat((self.u, self.v)).detach() #* torch.cat((mask, mask)) + self.updated_grad_uv * (1 - torch.cat((mask, mask)))
         #u.data = torch.clamp(u.data, 0., 1.)
         #v.data = torch.clamp(v.data, 0., 1.)
-        loss_best = loss_best * (1 - mask).squeeze() + loss_tmp.detach() * mask.squeeze()
+        loss_best = loss_tmp.detach() #* mask.squeeze() + loss_best * (1 - mask).squeeze()
         return loss_best
     
 class plotting_adversarial_update:
@@ -136,17 +141,26 @@ class plotting_adversarial_update:
 
     def set_uv(self, u, v):
         if self.type == "gradient_ascent":
-            adv = adversarial_gradient_ascent(self.model, u, v)
+            adv = adversarial_gradient_ascent(self.model, u, v, lr=1)
         elif self.type == "nesterov_accelerated":
-            adv = adverserial_nesterov_accelerated(self.model, u, v)
+            adv = adverserial_nesterov_accelerated(self.model, u, v, lr=1)
         else:
-            raise ValueError("type should be either gradient_ascent or nesterov_accelerated")
+            raise ValueError("adversarial_update" + self.type + " is unknown.")
         for _ in range(self.adv_iters):
             adv.step()
         return adv.u, adv.v
     
     def first_plot(self):
         plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
+        plt.show()
+    
+    def second_plot(self, u, v):
+        plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
+        plt.plot(u.cpu().detach(), self.model(u.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
+        plt.plot(v.cpu().detach(), self.model(v.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
+        u_new, v_new = self.set_uv(u, v)
+        plt.plot(u_new.cpu().detach(), self.model(u_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
+        plt.plot(v_new.cpu().detach(), self.model(v_new.unsqueeze(1)).squeeze(1).cpu().detach(), 'go')
         plt.show()
 
 class fully_connected(nn.Module):
@@ -179,7 +193,14 @@ def get_activation_function(activation_function):
         af = nn.ReLU
     return af
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = fully_connected([1, 20, 1], "ReLU")
+model = fully_connected([1, 20, 1], "sigmoid")
+for layer in model.layers:
+    if isinstance(layer, nn.Linear):
+        layer.weight.data = torch.randn(layer.weight.data.size())
+        print(layer.weight.data)
 model = model.to(device)
-plotting_adversarial_update(model, -1, 1).first_plot()
+plotting = plotting_adversarial_update(model, -1, 1, type="nesterov_accelerated", adv_iters=1000)
+#plotting.first_plot()
+plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
