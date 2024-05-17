@@ -75,7 +75,7 @@ class adversarial_gradient_ascent:
         # mask =  (loss_tmp > loss_best).type(torch.int).view(-1, 1, 1, 1)
         # u.data = u_tmp * mask + u.data * (1 - mask)
         # v.data = v_tmp * mask + v.data * (1 - mask)
-        self.lr = (self.lr * self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
+        #self.lr = (self.lr * self.lr_decay) # * (1 - mask)) + (lr * conf.reg_decay * mask)
         # u.data = torch.clamp(u.data, 0., 1.)
         # v.data = torch.clamp(v.data, 0., 1.)
         return loss_tmp
@@ -194,13 +194,14 @@ def get_activation_function(activation_function):
     return af
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = fully_connected([1, 20, 1], "sigmoid")
-for layer in model.layers:
-    if isinstance(layer, nn.Linear):
-        layer.weight.data = torch.randn(layer.weight.data.size())
-        print(layer.weight.data)
-model = model.to(device)
-plotting = plotting_adversarial_update(model, -1, 1, type="nesterov_accelerated", adv_iters=1000)
-#plotting.first_plot()
-plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
+if __name__ == '__main__':
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = fully_connected([1, 20, 1], "sigmoid")
+    for layer in model.layers:
+        if isinstance(layer, nn.Linear):
+            layer.weight.data = torch.randn(layer.weight.data.size())
+            print(layer.weight.data)
+    model = model.to(device)
+    plotting = plotting_adversarial_update(model, -1, 1, type="nesterov_accelerated", adv_iters=1000)
+    #plotting.first_plot()
+    plotting.second_plot(torch.tensor([-0.5]).to(device), torch.tensor([0.5]).to(device))
