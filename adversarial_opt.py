@@ -9,7 +9,10 @@ def l2_norm(x):
 
 class Flatten(nn.Module):
     def forward(self, x):
-        return x.view(x.size(0), -1)
+        if sum(x.shape)>2:
+            return x.view(x.size(0), -1)
+        else:
+            return x
 
 def get_reg_batch(conf, iterator):
     data, target = next(iterator)
@@ -32,11 +35,8 @@ class lip_constant_estimate:
         self.mean = mean
 
     def __call__(self, u, v):
-        uv = torch.cat((u, v), 0)
-        num = uv.shape[0] // 2
-        output = self.model(uv)
-        u_out = output[:num]
-        v_out = output[num:2*num]
+        u_out = self.model(u)
+        v_out = self.model(v)
         loss = self.out_norm(u_out - v_out) / self.in_norm(u - v)
         if self.mean:
             return torch.mean(torch.square(loss))
@@ -52,8 +52,8 @@ class adversarial_update:
                opt_kwargs):
         
         self.lip_constant_estimate = lip_constant_estimate(model)
-        self.u = nn.Parameter(u)
-        self.v = nn.Parameter(v)
+        self.u = nn.Parameter(u.clone())
+        self.v = nn.Parameter(v.clone())
         
         opt_name = opt_kwargs.get('name', 'SGD')
         if opt_name == 'SGD':
@@ -63,6 +63,11 @@ class adversarial_update:
         elif opt_name == 'Adam':
             self.opt = Adam([self.u, self.v], 
                            lr=opt_kwargs.get('lr', 0.001),)
+        elif opt_name == 'Nesterov':
+            self.opt = SGD([self.u, self.v], 
+                           lr=opt_kwargs.get('lr', 0.1), 
+                           momentum=opt_kwargs.get('lr', 0.9),
+                           nesterov=True)
         else:
             raise ValueError('Unknown optimizer: ' + str(opt_kwargs['name']))
         
@@ -175,16 +180,26 @@ class plotting_adversarial_update:
         self.adv_iters = adv_iters
         self.type = type
 
-    def set_uv(self, u, v):
+    def set_updater(self, u, v):
         if self.type == "gradient_ascent":
             adv = adversarial_gradient_ascent(self.model, u, v, lr=1)
         elif self.type == "nesterov_accelerated":
             adv = adverserial_nesterov_accelerated(self.model, u, v, lr=1)
+        elif self.type == "torch_gradient_ascent":
+            adv = adversarial_update(self.model, u, v, opt_kwargs={'name':'SGD', 'lr':1})
+        elif self.type == "torch_nesterov":
+            adv = adversarial_update(self.model, u, v, opt_kwargs={'name':'Nesterov', 'lr':1})
+        elif self.type == "torch_adam":
+            adv = adversarial_update(self.model, u, v, opt_kwargs={'name':'Adam', 'lr':0.01})
         else:
             raise ValueError("adversarial_update" + self.type + " is unknown.")
+        return adv
+
+    def print_uv(self, u, v):
+        adv = self.set_updater(u, v)
         for _ in range(self.adv_iters):
             adv.step()
-        return adv.u, adv.v
+        print(adv.u.cpu().detach(), adv.v.cpu().detach())
     
     def first_plot(self):
         plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
@@ -194,12 +209,7 @@ class plotting_adversarial_update:
         plt.plot(self.space.cpu(), self.model(self.space.unsqueeze(1)).squeeze(1).cpu().detach())
         plt.plot(u.cpu().detach(), self.model(u.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
         plt.plot(v.cpu().detach(), self.model(v.unsqueeze(1)).squeeze(1).cpu().detach(), 'ro', markersize=10)
-        if self.type == "gradient_ascent":
-            adv = adversarial_gradient_ascent(self.model, u, v, lr=1)
-        elif self.type == "nesterov_accelerated":
-            adv = adverserial_nesterov_accelerated(self.model, u, v, lr=1)
-        else:
-            raise ValueError("adversarial_update" + self.type + " is unknown.")
+        adv = self.set_updater(u, v)
         for _ in range(self.adv_iters):
             adv.step()
             u_new = adv.u
@@ -216,7 +226,6 @@ class fully_connected(nn.Module):
         self.act_fn = get_activation_function(act_fun)
         self.mean = mean
         self.std = std
-        
         layer_list = [Flatten()]
         for i in range(len(sizes)-1):
             layer_list.append(nn.Linear(sizes[i], sizes[i+1]))

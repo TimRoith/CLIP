@@ -72,7 +72,7 @@ model = BasicGaussianModel().to(device)
 u = torch.tensor([-2.5]).to(device)
 v = torch.tensor([1.0]).to(device)
 true_lipschitz = torch.exp(-torch.tensor(1)/2).to(device)
-list_name = ['SGD', 'Adam'] # , 'RMSprop', 'Adagrad', 'Adadelta', 'AdamW', 'Adamax', 'ASGD', 'LBFGS
-comparator = Comparator(model, true_lipschitz, u, v, list_name, lr_list={'SGD':0.5, 'Adam':0.05})
+list_name = ['SGD', 'Adam', 'Nesterov'] # , 'RMSprop', 'Adagrad', 'Adadelta', 'AdamW', 'Adamax', 'ASGD', 'LBFGS
+comparator = Comparator(model, true_lipschitz, u, v, list_name, lr_list={'SGD':0.5, 'Adam':0.05, 'Nesterov':0.1}, num_iters=1000)
 comparator.compare()
 comparator.plot()
