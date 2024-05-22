@@ -24,13 +24,11 @@ class Polynom:
         loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
         return loader, xy
 
-    def plot(self, ax=None):
-        x = torch.linspace(-1, 1, 100)
-        y = self.createdata(x)[1].cpu().detach()[:, 1]
-        if ax is None:
-            plt.plot(y)
-        else:
-            ax.plot(y)
+    def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
+        ax = plt if ax is None else ax
+        x = torch.linspace(xmin, xmax, num_pts)
+        y = self.createdata(x, sigma=0.)[1].cpu().detach()[:, 1]
+        ax.plot(x, y)
 
 class Trainer:
     def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=7, epsilon=1e-1):
@@ -117,8 +115,8 @@ class Trainer:
                 self.train_acc += equal.item()*1.0
         self.train_acc /= self.tot_steps
     
-    def plot(self, ax=None, line=None):
-        x = torch.linspace(-1, 1, 100).to(device)
+    def plot(self, ax=None, line=None, xmin=-1, xmax=1):
+        x = torch.linspace(xmin, xmax, 100).to(device)
         y = self.model(x.t()).cpu().detach()
         x = x.cpu().detach()
         ax = plt if ax is None else ax
@@ -135,18 +133,18 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1,)
     coeffs = torch.tensor([0,0,0.1,0.1,0.05]).to(device)
     polynom = Polynom(coeffs)
-    #polynom.plot()
-    x = torch.linspace(-1, 1, 100).to(device)
-    xy_loader = polynom.createdata(x,sigma=0)[0]
+    xmin,xmax=(-2,2)
+    polynom.plot(xmin=xmin,xmax=xmax)
+    x = torch.linspace(xmin, xmax, 200).to(device)
+    xy_loader = polynom.createdata(x,sigma=0.1)[0]
     XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    model = fully_connected([1, 20, 1], "ReLU")
+    model = fully_connected([1, 50, 50, 50, 50, 50, 1], "ReLU")
     model = model.to(device)
 
-    #model.std = 0.1
-    ax.plot(x.cpu(),model(x).cpu().detach())
+    #ax.plot(x.cpu(),model(x).cpu().detach())
     trainer = Trainer(model, xy_loader, 10, lamda=0.1, lr=0.005, adversarial_name="SGD", num_iters=1000)
-    line = trainer.plot(ax=ax)
+    line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     plt.show()
     num_total_iters = 50
     ax.scatter(XY[0,:],XY[1,:])
@@ -159,7 +157,7 @@ if __name__ == "__main__":
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
             #polynom.plot(ax=ax)
-            trainer.plot(ax=ax, line=line)
+            trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
             plt.pause(0.1)
     ax.set_title('Iteration: ' + str(num_total_iters))
     #polynom.plot(ax=ax)
