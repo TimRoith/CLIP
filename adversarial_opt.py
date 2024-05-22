@@ -227,9 +227,11 @@ class fully_connected(nn.Module):
         self.mean = mean
         self.std = std
         layer_list = [Flatten()]
-        for i in range(len(sizes)-1):
+        for i in range(len(sizes)-2):
             layer_list.append(nn.Linear(sizes[i], sizes[i+1]))
             layer_list.append(self.act_fn())
+            
+        layer_list.append(nn.Linear(sizes[-2], sizes[-1]))
             
         self.layers = nn.Sequential(*layer_list)
         

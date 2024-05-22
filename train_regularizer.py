@@ -13,13 +13,12 @@ class Polynom:
         self.degree = len(coeffs) - 1
 
     def __call__(self, x):
-        s=0
-        for i in range(self.degree+1):
-            s+=self.coeffs[i] * x**i
-        return s
-
-    def createdata(self, x):
-        y = self(x) + torch.randn_like(x) * 0.1
+        x = x[None, :]
+        x = x**torch.arange(self.degree+1)[:,None]
+        return torch.sum(self.coeffs[:,None] * x, dim=0)
+    
+    def createdata(self, x, sigma=0.1):
+        y = self(x) + torch.randn_like(x) * sigma
         xy = torch.stack((x, y), dim=1)
         dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
         loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
@@ -42,7 +41,8 @@ class Trainer:
         self.reg_max = lip_reg_max
         self.num_iters = num_iters
         self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr})
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
+        #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lamda = lamda
         self.epsilon = epsilon
         self.train_acc = 0.0
@@ -92,13 +92,15 @@ class Trainer:
 
             # Get classification loss
             c_loss = F.mse_loss(logits, y)
+            c_loss = torch.sum((logits-y)**2)
 
             # Change regularization parameter lamda
             lamda = self.lamda
             # check if Lipschitz term is too large. Note that regularization with
             # large Lipschitz terms yields instabilities!
             if not (c_reg_loss.item() > self.reg_max):
-                c_loss = c_loss + lamda * c_reg_loss
+                #c_loss = c_loss + lamda * c_reg_loss
+                pass
             else:
                 print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
@@ -114,29 +116,40 @@ class Trainer:
                 equal = torch.isclose(logits[i], y[i], atol=self.epsilon)
                 self.train_acc += equal.item()*1.0
         self.train_acc /= self.tot_steps
-    def plot(self, ax=None):
+    
+    def plot(self, ax=None, line=None):
         x = torch.linspace(-1, 1, 100).to(device)
         y = self.model(x.t()).cpu().detach()
-        if ax is None:
-            plt.plot(y)
+        x = x.cpu().detach()
+        ax = plt if ax is None else ax
+        
+        if line is None:
+            line = ax.plot(x, y)[0]
         else:
-            ax.plot(y)
+            line.set_ydata(y)
+            
+        return line
 
 if __name__ == "__main__":
     plt.close('all')
     fig, ax = plt.subplots(1,)
-    coeffs = [1., 2., 3.]
+    coeffs = torch.tensor([0,0,0.1,0.1,0.05]).to(device)
     polynom = Polynom(coeffs)
-    polynom.plot()
+    #polynom.plot()
     x = torch.linspace(-1, 1, 100).to(device)
-    xy_loader = polynom.createdata(x)[0]
-    model = fully_connected([1, 10, 10, 1], "ReLu")
+    xy_loader = polynom.createdata(x,sigma=0)[0]
+    XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
+    
+    model = fully_connected([1, 20, 1], "ReLU")
     model = model.to(device)
+
+    #model.std = 0.1
     ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 10, lamda=0.1, lr=0.1, adversarial_name="SGD", num_iters=1000)
-    trainer.plot()
+    trainer = Trainer(model, xy_loader, 10, lamda=0.1, lr=0.005, adversarial_name="SGD", num_iters=1000)
+    line = trainer.plot(ax=ax)
     plt.show()
-    num_total_iters = 5
+    num_total_iters = 50
+    ax.scatter(XY[0,:],XY[1,:])
     for i in range(num_total_iters):
         trainer.train_step()
         if i % 1 == 0:
@@ -145,11 +158,11 @@ if __name__ == "__main__":
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
-            polynom.plot(ax=ax)
-            trainer.plot(ax=ax)
+            #polynom.plot(ax=ax)
+            trainer.plot(ax=ax, line=line)
             plt.pause(0.1)
     ax.set_title('Iteration: ' + str(num_total_iters))
-    polynom.plot(ax=ax)
+    #polynom.plot(ax=ax)
     trainer.plot(ax=ax)
     ax.legend(["True", "Model"])
     plt.show()
