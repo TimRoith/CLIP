@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from adversarial_opt import fully_connected, adversarial_gradient_ascent, adverserial_nesterov_accelerated, adversarial_update, lip_constant_estimate, Flatten
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Polynom:
     def __init__(self, coeffs):
@@ -14,7 +14,8 @@ class Polynom:
 
     def __call__(self, x):
         x = x[None, :]
-        x = x**torch.arange(self.degree+1)[:,None]
+        d = torch.arange(self.degree+1)[:,None].to(device)
+        x = x**d
         return torch.sum(self.coeffs[:,None] * x, dim=0)
     
     def createdata(self, x, sigma=0.1):
@@ -26,9 +27,9 @@ class Polynom:
 
     def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
         ax = plt if ax is None else ax
-        x = torch.linspace(xmin, xmax, num_pts)
+        x = torch.linspace(xmin, xmax, num_pts).to(device)
         y = self.createdata(x, sigma=0.)[1].cpu().detach()[:, 1]
-        ax.plot(x, y)
+        ax.plot(x.cpu(), y)
 
 class Trainer:
     def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=7, epsilon=1e-1):
@@ -128,39 +129,61 @@ class Trainer:
             
         return line
 
+def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True):
+    if random:
+        if percent_loss > 0.5:
+            raise ValueError("percent_loss should be less than 0.5 for random loss of data")
+        xloss_down = xmin + (xmax - xmin) *percent_loss
+        xloss_up = xmax - (xmax - xmin) *percent_loss
+        #return one random point between xloss_down and xloss_up
+        xloss = torch.rand(1).item()*(xloss_up - xloss_down) + xloss_down
+        x_down = torch.linspace(xmin, xloss, num_pts//2)
+        x_up = torch.linspace(xloss + (xmax - xmin) *percent_loss, xmax, num_pts//2)
+        x = torch.cat([x_down, x_up])
+    else:
+        if percent_loss > 0.99:
+            raise ValueError("percent_loss should be less than 0.99 for fixed loss of data")
+        x_mid = (xmin + xmax) / 2
+        x_down = torch.linspace(xmin, x_mid - (x_mid - xmin) * percent_loss, num_pts//2)
+        x_up = torch.linspace(x_mid + (xmax - x_mid) * percent_loss, xmax, num_pts//2)
+        x = torch.cat([x_down, x_up])
+    return x
+
 if __name__ == "__main__":
-    plt.close('all')
+    #plt.close('all')
     fig, ax = plt.subplots(1,)
-    coeffs = torch.tensor([0,0,0.1,0.1,0.05]).to(device)
+    coeffs = torch.tensor([0.,0,-0.,0.,0.,0.,0.00001]).to(device)
     polynom = Polynom(coeffs)
-    xmin,xmax=(-2,2)
-    polynom.plot(xmin=xmin,xmax=xmax)
-    x = torch.linspace(xmin, xmax, 200).to(device)
-    xy_loader = polynom.createdata(x,sigma=0.1)[0]
+    xmin,xmax=(-3,3)
+    #polynom.plot(xmin=xmin,xmax=xmax)
+    x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
+    xy_loader = polynom.createdata(x,sigma=0.5)[0]
     XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    model = fully_connected([1, 50, 50, 50, 50, 50, 1], "ReLU")
+    model = fully_connected([1, 50, 50, 50, 50, 1], "ReLU")
     model = model.to(device)
 
     #ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 10, lamda=0.1, lr=0.005, adversarial_name="SGD", num_iters=1000)
-    line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    plt.show()
-    num_total_iters = 50
-    ax.scatter(XY[0,:],XY[1,:])
+    trainer = Trainer(model, xy_loader, 100, lamda=0.1, lr=0.003, adversarial_name="SGD", num_iters=1000)
+    #line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    #plt.show()
+    num_total_iters = 30
+    ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
     for i in range(num_total_iters):
         trainer.train_step()
         if i % 1 == 0:
             print(i)
-            ax.set_title('Iteration: ' + str(i))
+            #ax.set_title('Iteration: ' + str(i))
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
             #polynom.plot(ax=ax)
-            trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
-            plt.pause(0.1)
+            #trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
+            #plt.pause(0.1)
+            #plt.show()
     ax.set_title('Iteration: ' + str(num_total_iters))
-    #polynom.plot(ax=ax)
-    trainer.plot(ax=ax)
-    ax.legend(["True", "Model"])
+    polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
+    trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    ax.legend(["Sample","True polynom", "Fully Connected Model"])
+    fig.savefig('final_plot.png')
     plt.show()
