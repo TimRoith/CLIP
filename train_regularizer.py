@@ -3,26 +3,28 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from adversarial_opt import fully_connected, adversarial_gradient_ascent, adverserial_nesterov_accelerated, adversarial_update, lip_constant_estimate, Flatten
 device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Polynom:
-    def __init__(self, coeffs):
+    def __init__(self, coeffs, scaling=1.):
         self.coeffs = coeffs
         self.degree = len(coeffs) - 1
+        self.scaling = scaling
 
     def __call__(self, x):
         x = x[None, :]
         d = torch.arange(self.degree+1)[:,None].to(device)
         x = x**d
-        return torch.sum(self.coeffs[:,None] * x, dim=0)
+        return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
     
     def createdata(self, x, sigma=0.1):
         y = self(x) + torch.randn_like(x) * sigma
         xy = torch.stack((x, y), dim=1)
         dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
-        loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
         return loader, xy
 
     def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
@@ -53,7 +55,7 @@ class Trainer:
         # train phase
         self.model.train()
         opt = self.optimizer
-
+        scheduler = ReduceLROnPlateau(opt, 'min')
         # initialize values for train accuracy and train loss
         self.train_acc = 0.0
         self.train_loss = 0.0
@@ -75,13 +77,13 @@ class Trainer:
 
             # adversarial update on the Lipschitz set
             adv = self.adversarial(x)
-            for _ in range(self.num_iters):
-                adv.step()
-            u, v = adv.u, adv.v
+            # for _ in range(self.num_iters):
+            #     adv.step()
+            # u, v = adv.u, adv.v
             # ---------------------------------------------------------------------
 
             # Compute the Lipschitz constant
-            c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v)
+            #c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v)
             # reset gradients
             opt.zero_grad()
 
@@ -97,19 +99,21 @@ class Trainer:
             lamda = self.lamda
             # check if Lipschitz term is too large. Note that regularization with
             # large Lipschitz terms yields instabilities!
-            if not (c_reg_loss.item() > self.reg_max):
-                #c_loss = c_loss + lamda * c_reg_loss
-                pass
-            else:
-                print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
+            # if not (c_reg_loss.item() > self.reg_max):
+            #     #c_loss = c_loss + lamda * c_reg_loss
+            #     pass
+            # else:
+            #     print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
             # Update model parameters
             c_loss.backward()
             opt.step()
+            scheduler.step(c_loss)
+            
 
             # update accuracy and loss
             self.train_loss += c_loss.item()
-            self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
+            #self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
             for i in range(y.shape[0]):
                 self.tot_steps += 1
                 equal = torch.isclose(logits[i], y[i], atol=self.epsilon)
@@ -150,40 +154,41 @@ def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True
     return x
 
 if __name__ == "__main__":
-    #plt.close('all')
+    plt.close('all')
     fig, ax = plt.subplots(1,)
-    coeffs = torch.tensor([0.,0,-0.,0.,0.,0.,0.00001]).to(device)
-    polynom = Polynom(coeffs)
+    coeffs = torch.tensor([0.,0.01,-0.,0.,0.,0.,1]).to(device)
+    polynom = Polynom(coeffs, scaling=0.00005)
     xmin,xmax=(-3,3)
     #polynom.plot(xmin=xmin,xmax=xmax)
     x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
-    xy_loader = polynom.createdata(x,sigma=0.5)[0]
+    xy_loader = polynom.createdata(x,sigma=0.0)[0]
     XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    model = fully_connected([1, 50, 50, 50, 50, 1], "ReLU")
+    model = fully_connected([1, 600, 1000, 100, 1], "ReLU")
     model = model.to(device)
 
-    #ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=0.1, lr=0.003, adversarial_name="SGD", num_iters=1000)
-    #line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    ax.plot(x.cpu(),model(x).cpu().detach())
+    trainer = Trainer(model, xy_loader, 100, lamda=0.1, lr=0.001, adversarial_name="SGD", num_iters=1000)
+    line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
-    num_total_iters = 30
+    num_total_iters = 300
     ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
     for i in range(num_total_iters):
         trainer.train_step()
         if i % 1 == 0:
             print(i)
+            print(model.layers[1].weight)
             #ax.set_title('Iteration: ' + str(i))
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
             #polynom.plot(ax=ax)
-            #trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
-            #plt.pause(0.1)
-            #plt.show()
+            trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
+            plt.pause(0.1)
+
     ax.set_title('Iteration: ' + str(num_total_iters))
     polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
     trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     ax.legend(["Sample","True polynom", "Fully Connected Model"])
-    fig.savefig('final_plot.png')
-    plt.show()
+    #fig.savefig('final_plot.png')
+    #plt.show()
