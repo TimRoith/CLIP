@@ -34,11 +34,12 @@ class Polynom:
         ax.plot(x.cpu(), y)
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1):
+    def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
         self.lr = lr
+        self.backtracking = backtracking
         self.reg_max = lip_reg_max
         self.num_iters = num_iters
         self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr})
@@ -51,11 +52,15 @@ class Trainer:
         self.tot_steps = 0
         self.train_lip_loss = 0.0
 
+    def set_learning_rate(self, optimizer, new_lr):
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lr
+
     def train_step(self):
         # train phase
         self.model.train()
         opt = self.optimizer
-        scheduler = ReduceLROnPlateau(opt, 'min')
+        #scheduler = ReduceLROnPlateau(opt, 'min')
         # initialize values for train accuracy and train loss
         self.train_acc = 0.0
         self.train_loss = 0.0
@@ -76,7 +81,8 @@ class Trainer:
             # ---------------------------------------------------------------------
 
             # adversarial update on the Lipschitz set
-            adv = self.adversarial(x)
+            ux = torch.linspace(-3, 3, 40).to(device)
+            adv = self.adversarial(ux)
             for _ in range(self.num_iters):
                 adv.step()
             u, v = adv.u, adv.v
@@ -105,12 +111,52 @@ class Trainer:
             else:
                 print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
+            # Backtracking line search
+            if self.backtracking is not None:
+                initial_lr = self.lr
+                beta = 0.5
+                tau = self.backtracking
+
+                # Compute the objective function with the current parameters
+                f_up = c_loss.item()
+                success = False
+
+                while True:
+                    # Backup current model parameters
+                    backup_params = [p.clone() for p in self.model.parameters()]
+
+                    # Perform a gradient descent step with the reduced learning rate
+                    opt.step()
+
+                    # Compute the new objective function
+                    with torch.no_grad():
+                        new_logits = self.model(x)
+                        new_logits = new_logits.reshape(new_logits.shape[0])
+                        new_c_loss = F.mse_loss(new_logits, y)
+                        new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
+                        if not (new_c_reg_loss.item() > self.reg_max):
+                            new_c_loss = new_c_loss + lamda * new_c_reg_loss
+
+                    f_down = new_c_loss.item()
+
+                    if f_down <= f_up - tau * initial_lr:
+                        success = True
+                        break
+                    else:
+                        # Restore model parameters and reduce the learning rate
+                        for original, backup in zip(self.model.parameters(), backup_params):
+                            original.data.copy_(backup.data)
+                        initial_lr *= beta
+                        self.set_learning_rate(opt, initial_lr)
+
+                if not success:
+                    print("Backtracking line search failed to reduce the objective function.")
+
             # Update model parameters
             c_loss.backward()
             opt.step()
-            scheduler.step(c_loss)
+            #scheduler.step(c_loss)
             
-
             # update accuracy and loss
             self.train_loss += c_loss.item()
             self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
@@ -170,7 +216,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=100000.1, lr=0.001, adversarial_name="SGD", num_iters=10)
+    trainer = Trainer(model, xy_loader, 100, lamda=10.1, lr=0.001, adversarial_name="SGD", num_iters=10, backtracking=0.9)
     line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
     num_total_iters = 300
