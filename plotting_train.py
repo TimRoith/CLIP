@@ -22,33 +22,50 @@ model = fully_connected([1, 50, 100, 50, 1], "ReLU")
 model = model.to(device)
 num_total_iters = 100
 
-lambda_max = 100000
+#lambda_max = 100000
 #lamda = np.linspace(0, lambda_max, int(lambda_max*10))
-lamda = np.logspace(-3, 5, 100)
+lamda = np.logspace(-3, 5, 30)
+num_trainer = 5
 value_lip = []
 value_loss = []
 value_train_acc = []
+value_train_mse_loss = []
 max_lip = 0
 max_loss = 0
+max_mse = 0
 for lam in lamda:
-    trainer = Trainer(model, xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5) #, backtracking=0.9)
+    trainers = [Trainer(model, xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5) for _ in range(num_trainer)] #, backtracking=0.9)
+    train_acc = 0
+    train_loss = 0
+    train_lip_loss = 0
+    train_mse_loss = 0
     for i in range(num_total_iters):
-        trainer.train_step()
+        for j in range(num_trainer):
+            trainers[j].train_step()
+    for j in range(num_trainer):
+        train_acc += trainers[j].train_acc/num_trainer
+        train_loss += trainers[j].train_loss/num_trainer
+        train_lip_loss += trainers[j].train_lip_loss/num_trainer
+        train_mse_loss += trainers[j].saved_mse_loss/num_trainer
     print("lambda: ", lam)
-    print("loss: ", trainer.train_loss)
-    print("lip: ", trainer.train_lip_loss)
-    print("train accuracy : ", trainer.train_acc)
-    value_lip.append(trainer.train_lip_loss)
-    value_loss.append(trainer.train_loss)
-    value_train_acc.append(trainer.train_acc)
-    max_lip = max(max_lip, trainer.train_lip_loss)
-    max_loss = max(max_loss, trainer.train_loss)
+    print("loss: ", train_loss)
+    print("lip: ", train_lip_loss)
+    print("train accuracy : ", train_acc)
+    value_lip.append(train_lip_loss)
+    value_loss.append(train_loss)
+    value_train_acc.append(train_acc)
+    value_train_mse_loss.append(train_mse_loss)
+    max_lip = max(max_lip, train_lip_loss)
+    max_loss = max(max_loss, train_loss)
+    max_mse = max(max_mse, train_mse_loss)
 
 plt.figure()
 
 plt.plot(lamda, np.array(value_lip)/max_lip, label="Lip")
 plt.plot(lamda, np.array(value_loss)/max_loss, label="Loss")
 plt.plot(lamda, np.array(value_train_acc), label="Train Acc")
+plt.plot(lamda, np.array(value_train_mse_loss)/max_mse, label="MSE Loss")
+plt.title('Regularization')
 
 plt.xlabel('Lambda (log scale)')
 plt.ylabel('Normalized Value')

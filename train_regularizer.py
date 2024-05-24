@@ -51,6 +51,7 @@ class Trainer:
         self.train_loss = 0.0
         self.tot_steps = 0
         self.train_lip_loss = 0.0
+        self.saved_mse_loss = 0.0
 
     def set_learning_rate(self, optimizer, new_lr):
         for param_group in optimizer.param_groups:
@@ -100,7 +101,7 @@ class Trainer:
             # Get classification loss
             c_loss = F.mse_loss(logits, y)
             c_loss = torch.sum((logits-y)**2)
-
+            self.saved_mse_loss = c_loss.detach().item()
             # Change regularization parameter lamda
             lamda = self.lamda
             # check if Lipschitz term is too large. Note that regularization with
