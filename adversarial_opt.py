@@ -37,6 +37,7 @@ class lip_constant_estimate:
     def __call__(self, u, v):
         u_out = self.model(u)
         v_out = self.model(v)
+        #print("all shape :" , u.shape, v.shape, u_out.shape, v_out.shape)
         loss = self.out_norm(u_out - v_out) / self.in_norm(u - v)
         if self.mean:
             return torch.mean(torch.square(loss))
@@ -49,9 +50,11 @@ class adversarial_update:
     def __init__(self, 
                model,
                u, v, 
-               opt_kwargs):
+               opt_kwargs,
+               in_norm = None,
+               out_norm = None):
         
-        self.lip_constant_estimate = lip_constant_estimate(model)
+        self.lip_constant_estimate = lip_constant_estimate(model, in_norm=in_norm, out_norm=out_norm)
         self.u = nn.Parameter(u.clone())
         self.v = nn.Parameter(v.clone())
         

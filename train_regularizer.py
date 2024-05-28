@@ -15,16 +15,41 @@ class Polynom:
         self.scaling = scaling
 
     def __call__(self, x):
-        x = x[None, :]
-        d = torch.arange(self.degree+1)[:,None].to(device)
-        x = x**d
-        return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
+        if len(x.shape) <= 1:
+            x = x[None, :]
+            d = torch.arange(self.degree+1)[:,None].to(device)
+            x = x**d
+            return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
+        else :
+            powers = self.coeffs[:, :-1]  # Coefficients de puissance de dimension [d, n]
+            constants = self.coeffs[:, -1]  # Termes constants de dimension [d]
+
+            # Calcul du produit des termes x_j^c_{i,j} pour chaque terme i et chaque échantillon
+            x = x.unsqueeze(1)  # Dimension devient [100, 1, n]
+            powers = powers.unsqueeze(0)  # Dimension devient [1, d, n]
+            x_powers = x ** powers  # Diffusion pour obtenir une dimension [100, d, n]
+
+            # Produit des puissances sur la dernière dimension pour obtenir [100, d]
+            term_products = torch.prod(x_powers, dim=-1)
+
+            # Multiplication par les termes constants et somme des termes
+            result = self.scaling * torch.sum(constants * term_products, dim=-1)  # Dimension devient [100]
+            return result
     
     def createdata(self, x, sigma=0.1):
-        y = self(x) + torch.randn_like(x) * sigma
-        xy = torch.stack((x, y), dim=1)
-        dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
-        loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+        if len(x.shape) <= 1:
+            y_true = self(x)
+            y = y_true + torch.randn_like(y_true) * sigma
+            xy = torch.stack((x, y), dim=1)
+            dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
+            loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+        else :
+            n = x.shape[1]
+            y_true = self(x)
+            y = y_true + torch.randn_like(y_true) * sigma
+            xy = torch.cat((x, y[:,None]), dim=1)
+            dataset = torch.utils.data.TensorDataset(xy[:, :n], xy[:, n])
+            loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
         return loader, xy
 
     def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
@@ -34,7 +59,7 @@ class Polynom:
         ax.plot(x.cpu(), y)
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None):
+    def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -42,7 +67,7 @@ class Trainer:
         self.backtracking = backtracking
         self.reg_max = lip_reg_max
         self.num_iters = num_iters
-        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr})
+        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr}, in_norm = in_norm, out_norm = out_norm)
         #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lamda = lamda
@@ -82,7 +107,8 @@ class Trainer:
             # ---------------------------------------------------------------------
 
             # adversarial update on the Lipschitz set
-            ux = torch.linspace(-3, 3, 40).to(device)
+            #ux = torch.linspace(-3, 3, 40).to(device)
+            ux = x
             adv = self.adversarial(ux)
             for _ in range(self.num_iters):
                 adv.step()
@@ -180,24 +206,51 @@ class Trainer:
             
         return line
 
-def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True):
-    if random:
-        if percent_loss > 0.5:
-            raise ValueError("percent_loss should be less than 0.5 for random loss of data")
-        xloss_down = xmin + (xmax - xmin) *percent_loss
-        xloss_up = xmax - (xmax - xmin) *percent_loss
-        #return one random point between xloss_down and xloss_up
-        xloss = torch.rand(1).item()*(xloss_up - xloss_down) + xloss_down
-        x_down = torch.linspace(xmin, xloss, num_pts//2)
-        x_up = torch.linspace(xloss + (xmax - xmin) *percent_loss, xmax, num_pts//2)
-        x = torch.cat([x_down, x_up])
+def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True, dim=1):
+    if dim == 1:
+        if random:
+            if percent_loss > 0.5:
+                raise ValueError("percent_loss should be less than 0.5 for random loss of data")
+            xloss_down = xmin + (xmax - xmin) *percent_loss
+            xloss_up = xmax - (xmax - xmin) *percent_loss
+            #return one random point between xloss_down and xloss_up
+            xloss = torch.rand(1).item()*(xloss_up - xloss_down) + xloss_down
+            x_down = torch.linspace(xmin, xloss, num_pts//2)
+            x_up = torch.linspace(xloss + (xmax - xmin) *percent_loss, xmax, num_pts//2)
+            x = torch.cat([x_down, x_up])
+        else:
+            if percent_loss > 0.99:
+                raise ValueError("percent_loss should be less than 0.99 for fixed loss of data")
+            x_mid = (xmin + xmax) / 2
+            x_down = torch.linspace(xmin, x_mid - (x_mid - xmin) * percent_loss, num_pts//2)
+            x_up = torch.linspace(x_mid + (xmax - x_mid) * percent_loss, xmax, num_pts//2)
+            x = torch.cat([x_down, x_up])
     else:
-        if percent_loss > 0.99:
-            raise ValueError("percent_loss should be less than 0.99 for fixed loss of data")
-        x_mid = (xmin + xmax) / 2
-        x_down = torch.linspace(xmin, x_mid - (x_mid - xmin) * percent_loss, num_pts//2)
-        x_up = torch.linspace(x_mid + (xmax - x_mid) * percent_loss, xmax, num_pts//2)
-        x = torch.cat([x_down, x_up])
+        O = torch.zeros(dim)
+        x = []
+        if not random:
+            for _ in range(num_pts):
+                u =  (torch.rand_like(O) - torch.rand_like(O)).to(device)
+                up_or_down = torch.rand(1).item()
+                ray = torch.rand(1).item()*((xmax - xmin)/4)*(1-percent_loss)*(up_or_down < 0.5) + (((xmax - xmin)/4)*(1+percent_loss) + torch.rand(1).item()*((xmax - xmin)/4)*(1-percent_loss))*(up_or_down > 0.5)
+                u = (u / torch.norm(u))*ray
+                x_next = O + u
+                x.append(x_next.detach().cpu().numpy())
+        else:
+            m = torch.randint(1, dim, (1,)).item()
+            v = torch.zeros(dim)
+            v[m] = 1
+            n = 0
+            while n < num_pts:
+                u =  (torch.rand_like(O) - torch.rand_like(O)).to(device)
+                up_or_down = torch.rand(1).item()
+                u = (u / torch.norm(u))*(xmax - xmin)/2
+                x_next = O + u
+                xv_scalar = torch.abs(torch.dot(x_next, v)/(torch.norm(v)*torch.norm(x_next)))
+                if xv_scalar > percent_loss:
+                    x.append(x_next.detach().cpu().numpy())
+                    n += 1
+        x = torch.tensor(x)
     return x
 
 if __name__ == "__main__":
@@ -217,7 +270,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=10.1, lr=0.001, adversarial_name="SGD", num_iters=10, backtracking=0.9)
+    trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
     line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
     num_total_iters = 300
@@ -226,7 +279,7 @@ if __name__ == "__main__":
         trainer.train_step()
         if i % 1 == 0:
             print(i)
-            print(model.layers[1].weight)
+            #print(model.layers[1].weight)
             #ax.set_title('Iteration: ' + str(i))
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
