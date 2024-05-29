@@ -21,19 +21,16 @@ class Polynom:
             x = x**d
             return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
         else :
-            powers = self.coeffs[:, :-1]  # Coefficients de puissance de dimension [d, n]
-            constants = self.coeffs[:, -1]  # Termes constants de dimension [d]
+            powers = self.coeffs[:, :-1] 
+            constants = self.coeffs[:, -1]
+           
+            x = x.unsqueeze(1)  
+            powers = powers.unsqueeze(0)  
+            x_powers = x ** powers  
 
-            # Calcul du produit des termes x_j^c_{i,j} pour chaque terme i et chaque échantillon
-            x = x.unsqueeze(1)  # Dimension devient [100, 1, n]
-            powers = powers.unsqueeze(0)  # Dimension devient [1, d, n]
-            x_powers = x ** powers  # Diffusion pour obtenir une dimension [100, d, n]
-
-            # Produit des puissances sur la dernière dimension pour obtenir [100, d]
             term_products = torch.prod(x_powers, dim=-1)
 
-            # Multiplication par les termes constants et somme des termes
-            result = self.scaling * torch.sum(constants * term_products, dim=-1)  # Dimension devient [100]
+            result = self.scaling * torch.sum(constants * term_products, dim=-1) 
             return result
     
     def createdata(self, x, sigma=0.1):
@@ -52,10 +49,14 @@ class Polynom:
             loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
         return loader, xy
 
-    def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
+    def plot(self, dim, ax=None, num_pts=100, xmin=-1, xmax=1, projection_dim=1):
         ax = plt if ax is None else ax
-        x = torch.linspace(xmin, xmax, num_pts).to(device)
-        y = self.createdata(x, sigma=0.)[1].cpu().detach()[:, 1]
+        if dim == 1:
+            x = torch.linspace(xmin, xmax, num_pts).to(device)
+            y = self.createdata(x, sigma=0.)[1].cpu().detach()[:, 1]
+        else :
+            x, x_true = linear_points(num_pts=num_pts, xmin=xmin, xmax=xmax, dim=dim, coordinate=projection_dim)
+            y = self.createdata(x_true, sigma=0.)[1].cpu().detach()[:, dim]
         ax.plot(x.cpu(), y)
 
 class Trainer:
@@ -105,7 +106,6 @@ class Trainer:
             # ---------------------------------------------------------------------
             # Adversarial update
             # ---------------------------------------------------------------------
-
             # adversarial update on the Lipschitz set
             #ux = torch.linspace(-3, 3, 40).to(device)
             ux = x
@@ -113,6 +113,7 @@ class Trainer:
             for _ in range(self.num_iters):
                 adv.step()
             u, v = adv.u, adv.v
+            print("u or v are nan", torch.isnan(u).any() or torch.isnan(v).any())
             # ---------------------------------------------------------------------
 
             # Compute the Lipschitz constant
@@ -122,6 +123,8 @@ class Trainer:
 
             # evaluate model on batch
             logits = self.model(x)
+            if torch.isnan(logits).any() and torch.isnan(x).any():
+                print("logits and x are nan")
             logits = logits.reshape(logits.shape[0])
 
             # Get classification loss
@@ -252,6 +255,19 @@ def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True
                     n += 1
         x = torch.tensor(x)
     return x
+
+def linear_points(num_pts=100, xmin=-1, xmax=1, dim=1, coordinate=0):
+    if dim == 1:
+        x = torch.linspace(xmin, xmax, num_pts)
+        return x
+    else:
+        x_i = torch.linspace(xmin, xmax, num_pts)
+        x = torch.rand(num_pts, dim)
+        print(x.shape)
+        for i in range(num_pts):
+            x[i, coordinate] = x_i[i]
+        return x_i, x
+    
 
 if __name__ == "__main__":
     plt.close('all')

@@ -11,10 +11,12 @@ from sklearn.decomposition import PCA
 device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
-coeffs = torch.tensor([[1.0, 2.0, 3.0, 4.0], [0.5, 1.5, 2.5, 3.5]])
-polynom = Polynom(coeffs, scaling=0.00005)
+coeffs = torch.tensor([[1.0, 2.0, 3.0], [0.5, 1.5, 2.5]])
+polynom = Polynom(coeffs, scaling=0.5)
 xmin,xmax=(-3,3)
-n_dim = 3
+n_dim = 2
+polynom.plot(xmin = xmin,xmax = xmax, dim = n_dim, projection_dim=0)
+plt.show()
 x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False, dim=n_dim).to(device)
 xy_loader = polynom.createdata(x,sigma=0.0)[0]
 #XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])

@@ -37,7 +37,22 @@ class lip_constant_estimate:
     def __call__(self, u, v):
         u_out = self.model(u)
         v_out = self.model(v)
+        # print("u_out shape : ", u_out.shape)
+        # print("v_out shape : ", v_out.shape)
+        #print("u shape : ", u.shape)
+        # for i in range(u_out.shape[0]):
+        #     if not torch.isnan(u_out[i,0]):
+        #         print("u_out not nan : ", i)
+        #     if torch.isnan(u[i,0]):
+        #         print("u1 nan : ", i, torch.isnan(u[i,0]))
+        #     if torch.isnan(u[i,1]):
+        #         print("u2 nan : ", i, torch.isnan(u[i,1]))
+        #     if u_out[i,0] > 0 and u[i, 1] > 0 and u[i, 0] > 0 :
+        #         print("u values : ", u[i, :])
+        #         print("u_out values : ", u_out[i,0], i)
         #print("all shape :" , u.shape, v.shape, u_out.shape, v_out.shape)
+        #print("norm_out shape : ", self.out_norm(u_out - v_out).shape)
+        #print("norm_in shape : ", self.in_norm(u - v).shape)
         loss = self.out_norm(u_out - v_out) / self.in_norm(u - v)
         if self.mean:
             return torch.mean(torch.square(loss))
