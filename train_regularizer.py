@@ -11,7 +11,7 @@ device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Polynom:
     def __init__(self, coeffs, scaling=1.):
         self.coeffs = coeffs
-        self.degree = len(coeffs) - 1
+        self.degree = len(coeffs) - 1 #if len(coeffs.shape) == 1 else coeffs.shape[0] - 1
         self.scaling = scaling
 
     def __call__(self, x):
@@ -21,17 +21,16 @@ class Polynom:
             x = x**d
             return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
         else :
-            powers = self.coeffs[:, :-1] 
-            constants = self.coeffs[:, -1]
-           
-            x = x.unsqueeze(1)  
-            powers = powers.unsqueeze(0)  
-            x_powers = x ** powers  
-
-            term_products = torch.prod(x_powers, dim=-1)
-
-            result = self.scaling * torch.sum(constants * term_products, dim=-1) 
-            return result
+            for i in range(x.shape[1]):
+                x_i = x[:, i]
+                x_i = x_i[None, :]
+                d = torch.arange(self.degree+1)[:,None].to(device)
+                x_i = x_i**d
+                if i == 0:
+                    y = self.scaling * torch.sum(self.coeffs[:,None] * x_i, dim=0)
+                else:
+                    y += self.scaling * torch.sum(self.coeffs[:,None] * x_i, dim=0)
+            return y
     
     def createdata(self, x, sigma=0.1):
         if len(x.shape) <= 1:
@@ -107,13 +106,13 @@ class Trainer:
             # Adversarial update
             # ---------------------------------------------------------------------
             # adversarial update on the Lipschitz set
-            #ux = torch.linspace(-3, 3, 40).to(device)
+            ux = torch.linspace(-3, 3, 40).to(device)
             ux = x
             adv = self.adversarial(ux)
             for _ in range(self.num_iters):
                 adv.step()
             u, v = adv.u, adv.v
-            print("u or v are nan", torch.isnan(u).any() or torch.isnan(v).any())
+            # print("u or v are nan", torch.isnan(u).any() or torch.isnan(v).any())
             # ---------------------------------------------------------------------
 
             # Compute the Lipschitz constant
@@ -123,6 +122,7 @@ class Trainer:
 
             # evaluate model on batch
             logits = self.model(x)
+            #print("logits are nan", torch.isnan(logits).any())
             if torch.isnan(logits).any() and torch.isnan(x).any():
                 print("logits and x are nan")
             logits = logits.reshape(logits.shape[0])
@@ -137,7 +137,7 @@ class Trainer:
             # large Lipschitz terms yields instabilities!
             if not (c_reg_loss.item() > self.reg_max):
                 c_loss = c_loss + lamda * c_reg_loss
-                #pass
+                pass
             else:
                 print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
@@ -196,18 +196,26 @@ class Trainer:
                 self.train_acc += equal.item()*1.0
         self.train_acc /= self.tot_steps
     
-    def plot(self, ax=None, line=None, xmin=-1, xmax=1):
-        x = torch.linspace(xmin, xmax, 100).to(device)
-        y = self.model(x.t()).cpu().detach()
-        x = x.cpu().detach()
-        ax = plt if ax is None else ax
-        
-        if line is None:
-            line = ax.plot(x, y)[0]
-        else:
-            line.set_ydata(y)
+    def plot(self, ax=None, line=None, xmin=-1, xmax=1, dim=1, projection_dim=1):
+        if dim == 1:
+            x = torch.linspace(xmin, xmax, 100).to(device)
+            y = self.model(x.t()).cpu().detach()
+            x = x.cpu().detach()
+            ax = plt if ax is None else ax
             
-        return line
+            if line is None:
+                line = ax.plot(x, y)[0]
+            else:
+                line.set_ydata(y)
+                
+            return line
+        else:
+            x, x_true = linear_points(num_pts=100, xmin=xmin, xmax=xmax, dim=dim, coordinate=projection_dim)
+            y = self.model(x_true).cpu().detach()
+            x = x.cpu().detach()
+            ax = plt if ax is None else ax
+            ax.plot(x, y)
+            return None
 
 def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True, dim=1):
     if dim == 1:
