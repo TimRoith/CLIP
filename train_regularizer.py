@@ -113,14 +113,17 @@ class All_MNIST:
         return train, test
 
 
-    def get_transform(channels, size, train):
+    def get_transform(self, channels, size, train):
         t = []
         t.append(transforms.ToTensor())
         # compose the transform
         transform = transforms.Compose(t)
         return transform
 
-    def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1, num_workers=1):
+    def train_valid_test_split(self, train, test, test_size=1):
+        batch_size = self.batch_size
+        train_split = self.train_split
+        num_workers = self.num_workers
         total_count = len(train)
         train_count = int(train_split * total_count)
         val_count = total_count - train_count
@@ -205,7 +208,8 @@ class Trainer:
             #print("logits are nan", torch.isnan(logits).any())
             if torch.isnan(logits).any() and torch.isnan(x).any():
                 print("logits and x are nan")
-            logits = logits.reshape(logits.shape[0])
+            if self.loss == F.mse_loss:
+                logits = logits.reshape(logits.shape[0])
 
             # Get classification loss
             c_loss = self.loss(logits, y)
@@ -241,7 +245,8 @@ class Trainer:
                     # Compute the new objective function
                     with torch.no_grad():
                         new_logits = self.model(x)
-                        new_logits = new_logits.reshape(new_logits.shape[0])
+                        if self.loss == F.mse_loss:
+                            new_logits = new_logits.reshape(new_logits.shape[0])
                         new_c_loss = self.loss(new_logits, y)
                         new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
                         if not (new_c_reg_loss.item() > self.reg_max):
@@ -403,9 +408,19 @@ if __name__ == "__main__":
     # ax.legend(["Sample","True polynom", "Fully Connected Model"])
     #fig.savefig('final_plot.png')
     #plt.show()
-    model = fully_connected([1, 50, 100, 50, 1], "ReLU")
+    sizes = [784, 200, 80, 10]
+    model = fully_connected(sizes, "ReLU")
     model = model.to(device)
     data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
     xy_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()[0]
-    trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
+    trainer = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7)#, backtracking=0.9)
+    num_total_iters = 100
+    for i in range(num_total_iters):
+        trainer.train_step()
+        if i % 1 == 0:
+            print(i)
+            print("train accuracy : ", trainer.train_acc)
+            print("train loss : ", trainer.train_loss)
+            print("train lip loss : ", trainer.train_lip_loss)
+    
 
