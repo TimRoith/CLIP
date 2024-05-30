@@ -53,7 +53,7 @@ for lam in lamda:
         train_acc += trainers[j].train_acc/num_trainer
         train_loss += trainers[j].train_loss/num_trainer
         train_lip_loss += trainers[j].train_lip_loss/num_trainer
-        train_mse_loss += trainers[j].saved_mse_loss/num_trainer
+        train_mse_loss += trainers[j].saved_basic_loss/num_trainer
         if y_mean is None:
             y_mean = trainers[j].model(x_test)*(1/num_trainer)
         else : 

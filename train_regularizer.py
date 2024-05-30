@@ -2,8 +2,11 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import datasets, transforms
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+import os
 
 from adversarial_opt import fully_connected, adversarial_gradient_ascent, adverserial_nesterov_accelerated, adversarial_update, lip_constant_estimate, Flatten
 device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,14 +41,14 @@ class Polynom:
             y = y_true + torch.randn_like(y_true) * sigma
             xy = torch.stack((x, y), dim=1)
             dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
-            loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+            loader = torch.utils.data.DataLoader(dataset, batch_size=len(x), shuffle=True)
         else :
             n = x.shape[1]
             y_true = self(x)
             y = y_true + torch.randn_like(y_true) * sigma
             xy = torch.cat((x, y[:,None]), dim=1)
             dataset = torch.utils.data.TensorDataset(xy[:, :n], xy[:, n])
-            loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+            loader = torch.utils.data.DataLoader(dataset, batch_size=x.shape[0], shuffle=True)
         return loader, xy
 
     def plot(self, dim, ax=None, num_pts=100, xmin=-1, xmax=1, projection_dim=1):
@@ -58,8 +61,84 @@ class Polynom:
             y = self.createdata(x_true, sigma=0.)[1].cpu().detach()[:, dim]
         ax.plot(x.cpu(), y)
 
+class All_MNIST:
+    def __init__(self, data_file, download=False, data_set = "MNIST", batch_size = 100, train_split = 0.9, num_workers=1):
+        self.data_set = data_set
+        self.data_file = data_file
+        self.download = download
+        self.im_shape = None
+        self.data_set_mean = None
+        self.data_set_std = None
+        self.train_split = train_split
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+    
+    def __call__(self, test_size=1):
+        return self.get_data_set(test_size=test_size)
+    
+    def get_data_set(self, test_size=1):
+        train, valid, test, train_loader, valid_loader, test_loader = [None] * 6
+        if self.data_set == "MNIST":
+            self.im_shape = [1,28,28]
+            
+            # set mean and std for this dataset
+            self.data_set_mean = 0.1307
+            self.data_set_std = 0.3081
+            train, test = self.get_mnist()
+        elif self.data_set == "Fashion-MNIST":
+            self.data_set_mean = 0.5
+            self.data_set_std = 0.5
+            
+            self.im_shape = [1,28,28]
+            train, test = self.get_fashion_mnist()
+        else:
+            raise ValueError("Dataset:" + self.data_set + " not defined")
+        train_loader, valid_loader, test_loader = self.train_valid_test_split(train, test, test_size=test_size)
+
+        return train_loader, valid_loader, test_loader
+
+    def get_mnist(self):
+        transform = self.get_transform(1, 28, True)
+        #
+        train = datasets.MNIST(self.data_file, train=True, download=self.download, transform=transform)
+        test = datasets.MNIST(self.data_file, train=False, download=self.download, transform=transform)
+        return train, test
+
+    def get_fashion_mnist(self):
+        transform_train = self.get_transform("FashionMNIST", 1, 28, True)
+        transforms_test = self.get_transform("FashionMNIST", 1, 28, False)
+
+        train = datasets.FashionMNIST(self.data_file, train=True, download=self.download,transform=transform_train)
+        test = datasets.FashionMNIST(self.data_file, train=False, download=self.download, transform=transforms_test)
+        return train, test
+
+
+    def get_transform(channels, size, train):
+        t = []
+        t.append(transforms.ToTensor())
+        # compose the transform
+        transform = transforms.Compose(t)
+        return transform
+
+    def train_valid_test_split(train, test, batch_size, train_split=0.9, test_size=1, num_workers=1):
+        total_count = len(train)
+        train_count = int(train_split * total_count)
+        val_count = total_count - train_count
+        train, val = torch.utils.data.random_split(train, [train_count, val_count],generator=torch.Generator().manual_seed(42))
+
+        if test_size != 1:
+            test_count = int(len(test) * test_size)
+            _count = len(test) - test_count
+            test, _ = torch.utils.data.random_split(test, [test_count, _count])
+
+        train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=num_workers)
+        valid_loader = torch.utils.data.DataLoader(val, batch_size=1000, shuffle=True, pin_memory=True, num_workers=num_workers)
+        test_loader = torch.utils.data.DataLoader(test, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
+
+        return train_loader, valid_loader, test_loader
+
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max, lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None):
+    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -67,6 +146,7 @@ class Trainer:
         self.backtracking = backtracking
         self.reg_max = lip_reg_max
         self.num_iters = num_iters
+        self.loss = loss
         self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr}, in_norm = in_norm, out_norm = out_norm)
         #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -76,7 +156,7 @@ class Trainer:
         self.train_loss = 0.0
         self.tot_steps = 0
         self.train_lip_loss = 0.0
-        self.saved_mse_loss = 0.0
+        self.saved_basic_loss = 0.0
 
     def set_learning_rate(self, optimizer, new_lr):
         for param_group in optimizer.param_groups:
@@ -128,9 +208,9 @@ class Trainer:
             logits = logits.reshape(logits.shape[0])
 
             # Get classification loss
-            c_loss = F.mse_loss(logits, y)
-            c_loss = torch.sum((logits-y)**2)
-            self.saved_mse_loss = c_loss.detach().item()
+            c_loss = self.loss(logits, y)
+            #c_loss = torch.sum((logits-y)**2)
+            self.saved_basic_loss = c_loss.detach().item()
             # Change regularization parameter lamda
             lamda = self.lamda
             # check if Lipschitz term is too large. Note that regularization with
@@ -162,7 +242,7 @@ class Trainer:
                     with torch.no_grad():
                         new_logits = self.model(x)
                         new_logits = new_logits.reshape(new_logits.shape[0])
-                        new_c_loss = F.mse_loss(new_logits, y)
+                        new_c_loss = self.loss(new_logits, y)
                         new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
                         if not (new_c_reg_loss.item() > self.reg_max):
                             new_c_loss = new_c_loss + lamda * new_c_reg_loss
@@ -190,19 +270,22 @@ class Trainer:
             # update accuracy and loss
             self.train_loss += c_loss.item()
             self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
-            for i in range(y.shape[0]):
-                self.tot_steps += 1
-                equal = torch.isclose(logits[i], y[i], atol=self.epsilon)
-                self.train_acc += equal.item()*1.0
+            if self.loss == F.mse_loss:
+                for i in range(y.shape[0]):
+                    self.tot_steps += 1
+                    equal = torch.isclose(logits[i], y[i], atol=self.epsilon)
+                    self.train_acc += equal.item()*1.0
+            else:
+                self.train_acc += (logits.max(1)[1] == y).sum().item()
+                self.tot_steps += y.shape[0]
         self.train_acc /= self.tot_steps
     
-    def plot(self, ax=None, line=None, xmin=-1, xmax=1, dim=1, projection_dim=1):
+    def plot(self, ax=None, line=None, xmin=-1, xmax=1, dim=1, projection_dim=1, polynom=None):
+        ax = plt if ax is None else ax
         if dim == 1:
             x = torch.linspace(xmin, xmax, 100).to(device)
             y = self.model(x.t()).cpu().detach()
             x = x.cpu().detach()
-            ax = plt if ax is None else ax
-            
             if line is None:
                 line = ax.plot(x, y)[0]
             else:
@@ -213,7 +296,9 @@ class Trainer:
             x, x_true = linear_points(num_pts=100, xmin=xmin, xmax=xmax, dim=dim, coordinate=projection_dim)
             y = self.model(x_true).cpu().detach()
             x = x.cpu().detach()
-            ax = plt if ax is None else ax
+            if polynom is not None:
+                poly = polynom.createdata(x_true, sigma=0.)[1].cpu().detach()[:, dim]
+                ax.plot(x.cpu(), poly, lw=2, color='black')
             ax.plot(x, y)
             return None
 
@@ -278,43 +363,49 @@ def linear_points(num_pts=100, xmin=-1, xmax=1, dim=1, coordinate=0):
     
 
 if __name__ == "__main__":
-    plt.close('all')
-    fig, ax = plt.subplots(1,)
-    coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
-    polynom = Polynom(coeffs, scaling=0.00005)
-    xmin,xmax=(-3,3)
-    polynom.plot(xmin=xmin,xmax=xmax)
-    x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
-    xy_loader = polynom.createdata(x,sigma=0.0)[0]
-    XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
+    # plt.close('all')
+    # fig, ax = plt.subplots(1,)
+    # coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
+    # polynom = Polynom(coeffs, scaling=0.00005)
+    # xmin,xmax=(-3,3)
+    # polynom.plot(xmin=xmin,xmax=xmax)
+    # x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
+    # xy_loader = polynom.createdata(x,sigma=0.0)[0]
+    # XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    ax.set_ylim(XY[1, :].min()-0.01, XY[1, :].max()+0.01)
+    # ax.set_ylim(XY[1, :].min()-0.01, XY[1, :].max()+0.01)
     
-    model = fully_connected([1, 50, 100, 50, 1], "ReLU")
-    model = model.to(device)
+    # model = fully_connected([1, 50, 100, 50, 1], "ReLU")
+    # model = model.to(device)
 
-    ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
-    line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    #plt.show()
-    num_total_iters = 300
-    ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
-    for i in range(num_total_iters):
-        trainer.train_step()
-        if i % 1 == 0:
-            print(i)
-            #print(model.layers[1].weight)
-            #ax.set_title('Iteration: ' + str(i))
-            print("train accuracy : ", trainer.train_acc)
-            print("train loss : ", trainer.train_loss)
-            print("train lip loss : ", trainer.train_lip_loss)
-            #polynom.plot(ax=ax)
-            trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
-            plt.pause(0.1)
+    # ax.plot(x.cpu(),model(x).cpu().detach())
+    # trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
+    # line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    # #plt.show()
+    # num_total_iters = 300
+    # ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
+    # for i in range(num_total_iters):
+    #     trainer.train_step()
+    #     if i % 1 == 0:
+    #         print(i)
+    #         #print(model.layers[1].weight)
+    #         #ax.set_title('Iteration: ' + str(i))
+    #         print("train accuracy : ", trainer.train_acc)
+    #         print("train loss : ", trainer.train_loss)
+    #         print("train lip loss : ", trainer.train_lip_loss)
+    #         #polynom.plot(ax=ax)
+    #         trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
+    #         plt.pause(0.1)
 
-    ax.set_title('Iteration: ' + str(num_total_iters))
-    polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
-    trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    ax.legend(["Sample","True polynom", "Fully Connected Model"])
+    # ax.set_title('Iteration: ' + str(num_total_iters))
+    # polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
+    # trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    # ax.legend(["Sample","True polynom", "Fully Connected Model"])
     #fig.savefig('final_plot.png')
     #plt.show()
+    model = fully_connected([1, 50, 100, 50, 1], "ReLU")
+    model = model.to(device)
+    data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
+    xy_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()[0]
+    trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
+

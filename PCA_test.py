@@ -11,24 +11,24 @@ from sklearn.decomposition import PCA
 device ="cpu" #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
-coeffs = torch.tensor([0.5, 1.5, 2.5])
-polynom = Polynom(coeffs, scaling=0.5)
+coeffs = torch.tensor([0.5, 1.5, 2.5, 3.5, 4.5])
+polynom = Polynom(coeffs, scaling=0.005)
 xmin,xmax=(-3,3)
-n_dim = 2
-polynom.plot(xmin = xmin,xmax = xmax, dim = n_dim, projection_dim=0)
-plt.show()
+n_dim = 4
+projection_dim = 0
+#polynom.plot(xmin = xmin,xmax = xmax, dim = n_dim, projection_dim=projection_dim)
 x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False, dim=n_dim).to(device)
-xy_loader, xy = polynom.createdata(x,sigma=0.0)
+xy_loader, xy = polynom.createdata(x,sigma=0.01)
 #print("y is nan : ", torch.isnan(xy).any())
 #print("y : ", xy[:, n_dim])
 #XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
-
+#plt.show()
 
 model = fully_connected([n_dim, 50, 100, 50, 1], "ReLU")
 model = model.to(device)
 
-trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
-num_total_iters = 100
+trainer = Trainer(model, xy_loader, 100, lamda=10.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
+num_total_iters = 300
 for i in range(num_total_iters):
     trainer.train_step()
     if i % 1 == 0:
@@ -36,8 +36,8 @@ for i in range(num_total_iters):
         print("train accuracy : ", trainer.train_acc)
         print("train loss : ", trainer.train_loss)
         print("train lip loss : ", trainer.train_lip_loss)
-polynom.plot(xmin = xmin,xmax = xmax, dim = n_dim, projection_dim=0)
-trainer.plot(xmin=xmin, xmax=xmax, dim=n_dim, projection_dim=0)
+#plt.scatter(xy[:,projection_dim].cpu(),xy[:,n_dim].cpu())
+trainer.plot(xmin=xmin, xmax=xmax, dim=n_dim, projection_dim=projection_dim, polynom=polynom)
 plt.show()
 # df = (torch.rand(100)*6 - 3).unsqueeze(1).to(device)
 # df.requires_grad = True
