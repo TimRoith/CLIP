@@ -51,7 +51,10 @@ class Polynom:
             loader = torch.utils.data.DataLoader(dataset, batch_size=x.shape[0], shuffle=True)
         return loader, xy
 
-    def plot(self, dim, ax=None, num_pts=100, xmin=-1, xmax=1, projection_dim=1):
+    def plot(self, dim = None, ax=None, num_pts=100, xmin=-1, xmax=1, projection_dim=1):
+        if dim is None:
+            dim = 1
+            print("dim is None, assuming 1D")
         ax = plt if ax is None else ax
         if dim == 1:
             x = torch.linspace(xmin, xmax, num_pts).to(device)
@@ -141,7 +144,7 @@ class All_MNIST:
         return train_loader, valid_loader, test_loader
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None):
+    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None, CLIP = "standard"):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -160,6 +163,9 @@ class Trainer:
         self.tot_steps = 0
         self.train_lip_loss = 0.0
         self.saved_basic_loss = 0.0
+        self.random_lip_constant = 0.0
+        self.CLIP = CLIP
+        self.n_computations = 0
 
     def set_learning_rate(self, optimizer, new_lr):
         for param_group in optimizer.param_groups:
@@ -175,6 +181,7 @@ class Trainer:
         self.train_loss = 0.0
         self.tot_steps = 0
         self.train_lip_loss = 0.0
+        self.n_computations = 0
 
         #
         u = None
@@ -189,8 +196,31 @@ class Trainer:
             # Adversarial update
             # ---------------------------------------------------------------------
             # adversarial update on the Lipschitz set
-            ux = torch.linspace(-3, 3, 40).to(device)
-            ux = x
+            #ux = torch.linspace(-3, 3, 40).to(device)
+            # t_weight = torch.logspace(-3, 3, x.shape[0]).to(device)
+            # ux = x[:, None]
+            # ux.requires_grad = True
+            # vx = x + torch.rand_like(x)*1000
+            # lip_ux = lip_constant_estimate(self.model, mean = True)(ux, vx)
+            # grad_lip_ux = torch.autograd.grad(lip_ux, ux, create_graph=False)[0]
+            # max_grad = 0
+            # index = 0
+            # for i in range(x.shape[0]):
+            #     if torch.norm(grad_lip_ux[i]) > max_grad:
+            #         max_grad = torch.norm(grad_lip_ux[i])
+            #         index = i
+            # best_ux_value = ux[index]
+            # ux = best_ux_value
+            # ux_grad = grad_lip_ux[index]*t_weight[0]
+            # #print("x shape", x.shape)
+            # for i in range(x.shape[0]-1):
+            #     ux = torch.cat([ux, best_ux_value], dim=0)
+            #     ux_grad = torch.cat([ux_grad, grad_lip_ux[index]*t_weight[i+1]], dim=0)
+            # #print("grad shape", t_weight[:,None].shape)
+            # ux = ux + ux_grad
+            ux = torch.linspace(-3, 3, x.shape[0]).to(device)
+            #ux = x[:, None]
+            #print("x shape", x.shape)
             adv = self.adversarial(ux)
             for _ in range(self.num_iters):
                 adv.step()
@@ -199,7 +229,15 @@ class Trainer:
             # ---------------------------------------------------------------------
 
             # Compute the Lipschitz constant
-            c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v)
+            if self.CLIP == "standard":
+                c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v)
+            elif self.CLIP == "sum":
+                c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v) + self.train_lip_loss*self.n_computations
+                self.n_computations += 1
+                c_reg_loss = c_reg_loss/self.n_computations
+                self.train_lip_loss = c_reg_loss.item()
+            else :
+                raise ValueError("CLIP should be 'standard' or 'sum'")
             # reset gradients
             opt.zero_grad()
 
@@ -234,7 +272,9 @@ class Trainer:
                 # Compute the objective function with the current parameters
                 f_up = c_loss.item()
                 success = False
-
+                past_n_comp = self.n_computations
+                past_train_lip_loss = self.train_lip_loss
+                
                 while True:
                     # Backup current model parameters
                     backup_params = [p.clone() for p in self.model.parameters()]
@@ -248,7 +288,13 @@ class Trainer:
                         if self.loss == F.mse_loss:
                             new_logits = new_logits.reshape(new_logits.shape[0])
                         new_c_loss = self.loss(new_logits, y)
-                        new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
+                        if self.CLIP == "standard":
+                            new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
+                        elif self.CLIP == "sum":
+                            new_c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v) + self.train_lip_loss*self.n_computations
+                            self.n_computations += 1
+                            c_reg_loss = c_reg_loss/self.n_computations
+                            self.train_lip_loss = c_reg_loss.item()
                         if not (new_c_reg_loss.item() > self.reg_max):
                             new_c_loss = new_c_loss + lamda * new_c_reg_loss
 
@@ -259,6 +305,8 @@ class Trainer:
                         break
                     else:
                         # Restore model parameters and reduce the learning rate
+                        self.n_computations = past_n_comp
+                        self.train_lip_loss = past_train_lip_loss
                         for original, backup in zip(self.model.parameters(), backup_params):
                             original.data.copy_(backup.data)
                         initial_lr *= beta
@@ -274,7 +322,12 @@ class Trainer:
             
             # update accuracy and loss
             self.train_loss += c_loss.item()
-            self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
+            if self.CLIP == "standard":
+                self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
+            elif self.CLIP == "sum":
+                pass
+            else :
+                raise ValueError("CLIP should be 'standard' or 'sum'")
             if self.loss == F.mse_loss:
                 for i in range(y.shape[0]):
                     self.tot_steps += 1
@@ -284,6 +337,52 @@ class Trainer:
                 self.train_acc += (logits.max(1)[1] == y).sum().item()
                 self.tot_steps += y.shape[0]
         self.train_acc /= self.tot_steps
+        u_rand = torch.rand_like(x)*torch.rand(1).item()*1000
+        v_rand = torch.rand_like(x)*torch.rand(1).item()*1000
+        self.random_lip_constant = lip_constant_estimate(self.model, mean = True)(u_rand, v_rand).item()
+    
+    def test_step(self, test_loader, attack = None, verbosity = 1):
+        self.model.eval()
+        
+        test_acc = 0.0
+        test_loss = 0.0
+        tot_steps = 0
+        
+        # -------------------------------------------------------------------------
+        # loop over all batches
+        for batch_idx, (x, y) in enumerate(test_loader):
+            # get batch data
+            x, y = x.to(self.device), y.to(self.device)
+
+            # update x to a adverserial example
+            if attack is not None:
+                x = attack(model, x, y)
+            
+            # evaluate model on batch
+            logits = self.model(x)
+            
+            # Get classification loss
+            c_loss = self.loss(logits, y)
+            test_loss += c_loss.item()
+
+            if self.loss == F.mse_loss:
+                for i in range(y.shape[0]):
+                    tot_steps += 1
+                    equal = torch.isclose(logits[i], y[i], atol=self.epsilon)
+                    test_acc += equal.item()*1.0
+            elif self.loss == F.cross_entropy:
+                test_acc += (logits.max(1)[1] == y).sum().item()
+                tot_steps += y.shape[0]
+            else:
+                raise ValueError("loss should be F.mse_loss or F.cross_entropy")
+        
+        test_acc /= tot_steps
+            
+        # print accuracy
+        if verbosity > 0: 
+            print(50*"-")
+            print('Test Accuracy:', test_acc)
+        return {'test_loss':test_loss, 'test_acc':test_acc}
     
     def plot(self, ax=None, line=None, xmin=-1, xmax=1, dim=1, projection_dim=1, polynom=None):
         ax = plt if ax is None else ax
@@ -368,59 +467,81 @@ def linear_points(num_pts=100, xmin=-1, xmax=1, dim=1, coordinate=0):
     
 
 if __name__ == "__main__":
-    # plt.close('all')
-    # fig, ax = plt.subplots(1,)
-    # coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
-    # polynom = Polynom(coeffs, scaling=0.00005)
-    # xmin,xmax=(-3,3)
-    # polynom.plot(xmin=xmin,xmax=xmax)
-    # x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
-    # xy_loader = polynom.createdata(x,sigma=0.0)[0]
-    # XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
+    plt.close('all')
+    fig, ax = plt.subplots(1,)
+    coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
+    polynom = Polynom(coeffs, scaling=0.00005)
+    xmin,xmax=(-3,3)
+    polynom.plot(xmin=xmin,xmax=xmax)
+    x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
+    xy_loader = polynom.createdata(x,sigma=0.0)[0]
+    XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    # ax.set_ylim(XY[1, :].min()-0.01, XY[1, :].max()+0.01)
+    ax.set_ylim(XY[1, :].min()-0.01, XY[1, :].max()+0.01)
     
-    # model = fully_connected([1, 50, 100, 50, 1], "ReLU")
-    # model = model.to(device)
-
-    # ax.plot(x.cpu(),model(x).cpu().detach())
-    # trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=50)#, backtracking=0.9)
-    # line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    # #plt.show()
-    # num_total_iters = 300
-    # ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
-    # for i in range(num_total_iters):
-    #     trainer.train_step()
-    #     if i % 1 == 0:
-    #         print(i)
-    #         #print(model.layers[1].weight)
-    #         #ax.set_title('Iteration: ' + str(i))
-    #         print("train accuracy : ", trainer.train_acc)
-    #         print("train loss : ", trainer.train_loss)
-    #         print("train lip loss : ", trainer.train_lip_loss)
-    #         #polynom.plot(ax=ax)
-    #         trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
-    #         plt.pause(0.1)
-
-    # ax.set_title('Iteration: ' + str(num_total_iters))
-    # polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
-    # trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    # ax.legend(["Sample","True polynom", "Fully Connected Model"])
-    #fig.savefig('final_plot.png')
-    #plt.show()
-    sizes = [784, 200, 80, 10]
-    model = fully_connected(sizes, "ReLU")
+    model = fully_connected([1, 50, 100, 50, 1], "ReLU")
     model = model.to(device)
-    data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
-    xy_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()[0]
-    trainer = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7)#, backtracking=0.9)
-    num_total_iters = 100
+
+    ax.plot(x.cpu(),model(x).cpu().detach())
+    trainer = Trainer(model, xy_loader, 100, lamda=0.05, lr=0.001, adversarial_name="SGD", num_iters=50, CLIP="sum")#, backtracking=0.9)
+    line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    #plt.show()
+    num_total_iters = 300
+    ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
     for i in range(num_total_iters):
         trainer.train_step()
         if i % 1 == 0:
             print(i)
+            #print(model.layers[1].weight)
+            #ax.set_title('Iteration: ' + str(i))
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
+            #polynom.plot(ax=ax)
+            trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
+            plt.pause(0.1)
+
+    ax.set_title('Iteration: ' + str(num_total_iters))
+    polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
+    trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
+    ax.legend(["Sample","True polynom", "Fully Connected Model"])
+    fig.savefig('final_plot.png')
+    plt.show()
+    # sizes = [784, 200, 80, 10]
+    # model = fully_connected(sizes, "ReLU")
+    # model = model.to(device)
+    # data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
+    # xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
+    # trainer = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7, CLIP = "sum")#, backtracking=0.9)
+    # num_total_iters = 100
+    # for i in range(num_total_iters):
+    #     trainer.train_step()
+    #     if i % 1 == 0:
+    #         print(i)
+    #         print("train accuracy : ", trainer.train_acc)
+    #         print("train loss : ", trainer.train_loss)
+    #         print("train lip loss : ", trainer.train_lip_loss)
+    #         print("random lip constant : ", trainer.random_lip_constant)
+    #         print("saved basic loss : ", trainer.saved_basic_loss)
+
+    # sizes = [784, 200, 80, 10]
+    # model = fully_connected(sizes, "ReLU")
+    # model = model.to(device)
+    # trainer_standard = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7, CLIP = "standard")#, backtracking=0.9)
+    # num_total_iters = 100
+    # for i in range(num_total_iters):
+    #     trainer_standard.train_step()
+    #     if i % 1 == 0:
+    #         print(i)
+    #         print("train accuracy : ", trainer_standard.train_acc)
+    #         print("train loss : ", trainer_standard.train_loss)
+    #         print("train lip loss : ", trainer_standard.train_lip_loss)
+    #         print("random lip constant : ", trainer_standard.random_lip_constant)
+    #         print("saved basic loss : ", trainer_standard.saved_basic_loss)
+    
+    # print("test result for sum CLIP :")
+    # test_result = trainer.test_step(test_loader, verbosity=1)
+    # print("test result for standard CLIP :")
+    # test_result = trainer_standard.test_step(test_loader, verbosity=1)
     
 

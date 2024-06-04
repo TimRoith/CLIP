@@ -78,6 +78,7 @@ class Trainer:
 
             # adversarial update on the Lipschitz set
             ux = torch.linspace(-3, 3, 40).to(device)
+            #ux = x
             adv = self.adversarial(ux)
             for _ in range(self.num_iters):
                 adv.step()
@@ -172,7 +173,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=0.1, lr=0.001, adversarial_name="SGD", num_iters=10)
+    trainer = Trainer(model, xy_loader, 100, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=10)
     line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
     num_total_iters = 300
