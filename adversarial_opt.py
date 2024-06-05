@@ -26,13 +26,13 @@ class lip_constant_estimate:
         self, model, 
         out_norm = None, 
         in_norm=None, 
-        mean=False
+        estimation="sum"
     ):
 
         self.model = model
         self.out_norm = out_norm if out_norm is not None else l2_norm
         self.in_norm = in_norm if in_norm is not None else l2_norm
-        self.mean = mean
+        self.estimation = estimation
 
     def __call__(self, u, v):
         u_out = self.model(u)
@@ -54,10 +54,14 @@ class lip_constant_estimate:
         #print("norm_out shape : ", self.out_norm(u_out - v_out).shape)
         #print("norm_in shape : ", self.in_norm(u - v).shape)
         loss = self.out_norm(u_out - v_out) / self.in_norm(u - v)
-        if self.mean:
+        if self.estimation == "sum":
             return torch.mean(torch.square(loss))
-        else:
+        elif self.estimation == "max":
+            return torch.square(torch.max(loss))
+        elif self.estimation == "1D":
             return torch.square(loss)
+        else :
+            raise ValueError("Lipschitz estimation should be '1D', 'max' or 'sum'")
         
         
         

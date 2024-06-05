@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import adversarial_attacks as at
 
 import os
 
@@ -144,7 +145,7 @@ class All_MNIST:
         return train_loader, valid_loader, test_loader
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-1, backtracking=None, in_norm=None, out_norm=None, CLIP = "standard"):
+    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -153,10 +154,17 @@ class Trainer:
         self.reg_max = lip_reg_max
         self.num_iters = num_iters
         self.loss = loss
+        self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = CLIP_estimation)(u, v)
         self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs={'name':adversarial_name, 'lr':self.lr}, in_norm = in_norm, out_norm = out_norm)
         #self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lamda = lamda
+        self.lamda_stuck = lamda_stuck
+        self.maximal_lamda = lamda*2
+        self.minimal_lamda = lamda*0.25
+        self.dlamda = lamda*percent_of_lamda
+        self.saved_min_acc = min_accuracy
+        self.min_acc = min_accuracy
         self.epsilon = epsilon
         self.train_acc = 0.0
         self.train_loss = 0.0
@@ -164,8 +172,12 @@ class Trainer:
         self.train_lip_loss = 0.0
         self.saved_basic_loss = 0.0
         self.random_lip_constant = 0.0
-        self.CLIP = CLIP
-        self.n_computations = 0
+        self.warm_up = True
+        if iter_warm_up is not None:
+            self.iter_warm_up = iter_warm_up
+        else:
+            print("No warm up iteration defined, using default value of 10.")
+            self.iter_warm_up = 10
 
     def set_learning_rate(self, optimizer, new_lr):
         for param_group in optimizer.param_groups:
@@ -181,7 +193,6 @@ class Trainer:
         self.train_loss = 0.0
         self.tot_steps = 0
         self.train_lip_loss = 0.0
-        self.n_computations = 0
 
         #
         u = None
@@ -197,47 +208,43 @@ class Trainer:
             # ---------------------------------------------------------------------
             # adversarial update on the Lipschitz set
             #ux = torch.linspace(-3, 3, 40).to(device)
-            # t_weight = torch.logspace(-3, 3, x.shape[0]).to(device)
-            # ux = x[:, None]
-            # ux.requires_grad = True
-            # vx = x + torch.rand_like(x)*1000
-            # lip_ux = lip_constant_estimate(self.model, mean = True)(ux, vx)
-            # grad_lip_ux = torch.autograd.grad(lip_ux, ux, create_graph=False)[0]
-            # max_grad = 0
-            # index = 0
-            # for i in range(x.shape[0]):
-            #     if torch.norm(grad_lip_ux[i]) > max_grad:
-            #         max_grad = torch.norm(grad_lip_ux[i])
-            #         index = i
-            # best_ux_value = ux[index]
-            # ux = best_ux_value
-            # ux_grad = grad_lip_ux[index]*t_weight[0]
-            # #print("x shape", x.shape)
-            # for i in range(x.shape[0]-1):
-            #     ux = torch.cat([ux, best_ux_value], dim=0)
-            #     ux_grad = torch.cat([ux_grad, grad_lip_ux[index]*t_weight[i+1]], dim=0)
-            # #print("grad shape", t_weight[:,None].shape)
-            # ux = ux + ux_grad
-            ux = torch.linspace(-3, 3, x.shape[0]).to(device)
-            #ux = x[:, None]
-            #print("x shape", x.shape)
-            adv = self.adversarial(ux)
-            for _ in range(self.num_iters):
-                adv.step()
-            u, v = adv.u, adv.v
-            # print("u or v are nan", torch.isnan(u).any() or torch.isnan(v).any())
-            # ---------------------------------------------------------------------
+            if not self.warm_up:
+                if sum(x.shape)-x.shape[0] > 1:
+                    t_weight = torch.logspace(-3, 3, x.shape[0]).to(device)
+                    ux = x[:, None]
+                    ux.requires_grad = True
+                    vx = x + torch.rand_like(x)*1000
+                    lip_ux = self.lipschitz(ux, vx)
+                    grad_lip_ux = torch.autograd.grad(lip_ux, ux, create_graph=False)[0]
+                    max_grad = 0
+                    index = 0
+                    for i in range(x.shape[0]):
+                        if torch.norm(grad_lip_ux[i]) > max_grad:
+                            max_grad = torch.norm(grad_lip_ux[i])
+                            index = i
+                    best_ux_value = ux[index]
+                    ux = best_ux_value
+                    ux_grad = grad_lip_ux[index]*t_weight[0]
+                    #print("x shape", x.shape)
+                    for i in range(x.shape[0]-1):
+                        ux = torch.cat([ux, best_ux_value], dim=0)
+                        ux_grad = torch.cat([ux_grad, grad_lip_ux[index]*t_weight[i+1]], dim=0)
+                    #print("grad shape", t_weight[:,None].shape)
+                    ux = ux + ux_grad
+                else:
+                    ux = torch.linspace(-3, 3, x.shape[0]).to(device)
+                #ux = x[:, None]
+                #print("x shape", x.shape)
+                adv = self.adversarial(ux)
+                for _ in range(self.num_iters):
+                    adv.step()
+                u, v = adv.u, adv.v
+                # print("u or v are nan", torch.isnan(u).any() or torch.isnan(v).any())
+                # ---------------------------------------------------------------------
 
-            # Compute the Lipschitz constant
-            if self.CLIP == "standard":
-                c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v)
-            elif self.CLIP == "sum":
-                c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v) + self.train_lip_loss*self.n_computations
-                self.n_computations += 1
-                c_reg_loss = c_reg_loss/self.n_computations
-                self.train_lip_loss = c_reg_loss.item()
-            else :
-                raise ValueError("CLIP should be 'standard' or 'sum'")
+                # Compute the Lipschitz constant
+                c_reg_loss = self.lipschitz(u, v)
+            
             # reset gradients
             opt.zero_grad()
 
@@ -253,15 +260,16 @@ class Trainer:
             c_loss = self.loss(logits, y)
             #c_loss = torch.sum((logits-y)**2)
             self.saved_basic_loss = c_loss.detach().item()
-            # Change regularization parameter lamda
+            # Use regularization parameter lamda
             lamda = self.lamda
             # check if Lipschitz term is too large. Note that regularization with
             # large Lipschitz terms yields instabilities!
-            if not (c_reg_loss.item() > self.reg_max):
-                c_loss = c_loss + lamda * c_reg_loss
-                pass
-            else:
-                print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
+            if not self.warm_up:
+                if not (c_reg_loss.item() > self.reg_max):
+                    c_loss = c_loss + lamda * c_reg_loss
+                    pass
+                else:
+                    print('The Lipschitz constant was too big:', c_reg_loss.item(), ". No Lip Regularization for this batch!")
 
             # Backtracking line search
             if self.backtracking is not None:
@@ -272,8 +280,6 @@ class Trainer:
                 # Compute the objective function with the current parameters
                 f_up = c_loss.item()
                 success = False
-                past_n_comp = self.n_computations
-                past_train_lip_loss = self.train_lip_loss
                 
                 while True:
                     # Backup current model parameters
@@ -288,15 +294,10 @@ class Trainer:
                         if self.loss == F.mse_loss:
                             new_logits = new_logits.reshape(new_logits.shape[0])
                         new_c_loss = self.loss(new_logits, y)
-                        if self.CLIP == "standard":
-                            new_c_reg_loss = lip_constant_estimate(self.model, mean=True)(u, v)
-                        elif self.CLIP == "sum":
-                            new_c_reg_loss = lip_constant_estimate(self.model, mean = True)(u, v) + self.train_lip_loss*self.n_computations
-                            self.n_computations += 1
-                            c_reg_loss = c_reg_loss/self.n_computations
-                            self.train_lip_loss = c_reg_loss.item()
-                        if not (new_c_reg_loss.item() > self.reg_max):
-                            new_c_loss = new_c_loss + lamda * new_c_reg_loss
+                        if not self.warm_up:
+                            new_c_reg_loss = self.lipschitz(u, v)
+                            if not (new_c_reg_loss.item() > self.reg_max):
+                                new_c_loss = new_c_loss + lamda * new_c_reg_loss
 
                     f_down = new_c_loss.item()
 
@@ -305,8 +306,6 @@ class Trainer:
                         break
                     else:
                         # Restore model parameters and reduce the learning rate
-                        self.n_computations = past_n_comp
-                        self.train_lip_loss = past_train_lip_loss
                         for original, backup in zip(self.model.parameters(), backup_params):
                             original.data.copy_(backup.data)
                         initial_lr *= beta
@@ -322,12 +321,8 @@ class Trainer:
             
             # update accuracy and loss
             self.train_loss += c_loss.item()
-            if self.CLIP == "standard":
+            if not self.warm_up:
                 self.train_lip_loss = max(c_reg_loss.item(), self.train_lip_loss)
-            elif self.CLIP == "sum":
-                pass
-            else :
-                raise ValueError("CLIP should be 'standard' or 'sum'")
             if self.loss == F.mse_loss:
                 for i in range(y.shape[0]):
                     self.tot_steps += 1
@@ -336,10 +331,29 @@ class Trainer:
             else:
                 self.train_acc += (logits.max(1)[1] == y).sum().item()
                 self.tot_steps += y.shape[0]
-        self.train_acc /= self.tot_steps
+            self.train_acc /= self.tot_steps
+            if self.min_acc is not None : 
+                if self.train_acc > self.min_acc:
+                    self.warm_up = False
+                    self.lamda = min(self.lamda + self.dlamda, self.maximal_lamda)
+                    self.dlamda = self.dlamda*0.9
+                    weight = 0.6
+                    self.min_acc = (self.train_acc*weight + self.saved_min_acc*(2-weight))/2
+                elif not self.warm_up:
+                     self.lamda = max(self.lamda - self.dlamda, self.minimal_lamda)
+                     self.dlamda = self.dlamda*0.9
+                     if self.lamda == self.minimal_lamda:
+                         self.min_acc = self.saved_min_acc
+            elif self.iter_warm_up == 0:
+                self.warm_up = False
+                self.min_acc = self.train_acc
+                self.saved_min_acc = (self.train_acc+0.5)/2
+            else:
+                self.iter_warm_up -= 1
+            self.lamda = self.lamda_stuck if self.lamda_stuck is not None else self.lamda
         u_rand = torch.rand_like(x)*torch.rand(1).item()*1000
         v_rand = torch.rand_like(x)*torch.rand(1).item()*1000
-        self.random_lip_constant = lip_constant_estimate(self.model, mean = True)(u_rand, v_rand).item()
+        self.random_lip_constant = self.lipschitz(u_rand, v_rand).item()
     
     def test_step(self, test_loader, attack = None, verbosity = 1):
         self.model.eval()
@@ -356,7 +370,7 @@ class Trainer:
 
             # update x to a adverserial example
             if attack is not None:
-                x = attack(model, x, y)
+                x = attack(x, y)
             
             # evaluate model on batch
             logits = self.model(x)
@@ -405,6 +419,29 @@ class Trainer:
                 ax.plot(x.cpu(), poly, lw=2, color='black')
             ax.plot(x, y)
             return None
+
+class adversarial_attack:
+    def __init__(self, model, loss = F.mse_loss, attack_type="gauss_attack", nl =1, epsilon=1e-1, xmin=-1, xmax=1, num_iters=1):
+        self.model = model
+        self.loss = loss
+        self.epsilon = epsilon
+        self.nl = nl
+        self.xmin = xmin
+        self.xmax = xmax
+        self.num_iters = num_iters
+        self.attack_type = attack_type
+        self.attack = None
+        if attack_type == "gauss_attack":
+            self.attack = at.gauss_attack(nl=self.nl, x_min=self.xmin, x_max=self.xmax)
+        elif attack_type == "fgsm_attack":
+            self.attack = at.fgsm(self.loss, epsilon=self.epsilon, x_min=self.xmin, x_max=self.xmax)
+        elif attack_type == "pgd_attack":
+            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, alpha=None, alpha_mul=1.0, norm_type="l2")
+        else:
+            raise ValueError("Attack type not defined")
+    
+    def __call__(self, x, y):
+        return self.attack(self.model, x, y)
 
 def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True, dim=1):
     if dim == 1:
@@ -482,11 +519,13 @@ if __name__ == "__main__":
     model = fully_connected([1, 50, 100, 50, 1], "ReLU")
     model = model.to(device)
 
-    ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=0.05, lr=0.001, adversarial_name="SGD", num_iters=50, CLIP="sum")#, backtracking=0.9)
+    #ax.plot(x.cpu(),model(x).cpu().detach())
+    num_total_iters = 500
+    lamda = 0.1
+
+    trainer = Trainer(model, xy_loader, 100, lamda=lamda, lr=0.001, adversarial_name="SGD", num_iters=50, epsilon=5e-3, min_accuracy=None, CLIP_estimation="sum", iter_warm_up=num_total_iters//4)#, lamda_stuck=lamda)#, backtracking=0.9)
     line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
-    num_total_iters = 300
     ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
     for i in range(num_total_iters):
         trainer.train_step()
@@ -497,14 +536,15 @@ if __name__ == "__main__":
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
             print("train lip loss : ", trainer.train_lip_loss)
+            print("current lamda : ", trainer.lamda)
             #polynom.plot(ax=ax)
             trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
             plt.pause(0.1)
 
     ax.set_title('Iteration: ' + str(num_total_iters))
-    polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
-    trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
-    ax.legend(["Sample","True polynom", "Fully Connected Model"])
+    #polynom.plot(ax=ax, xmin=xmin,xmax=xmax)
+    trainer.plot(ax=ax, line=line, xmin=xmin,xmax=xmax)
+    ax.legend(["True polynom", "Fully Connected Model"])
     fig.savefig('final_plot.png')
     plt.show()
     # sizes = [784, 200, 80, 10]
@@ -512,8 +552,23 @@ if __name__ == "__main__":
     # model = model.to(device)
     # data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
     # xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
-    # trainer = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7, CLIP = "sum")#, backtracking=0.9)
-    # num_total_iters = 100
+    # trainer = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.002, adversarial_name="SGD", num_iters=4, CLIP = "sum")#, backtracking=0.9)
+    # model_standard = fully_connected(sizes, "ReLU")
+    # model_standard = model_standard.to(device)
+    # trainer_standard = Trainer(model_standard, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.002, adversarial_name="SGD", num_iters=4, CLIP = "standard")#, backtracking=0.9)
+    
+    # num_total_iters = 20
+
+    # print("test result for sum CLIP :")
+    # test_result = trainer.test_step(test_loader, verbosity=1)
+    # print("test result for standard CLIP :")
+    # test_result = trainer_standard.test_step(test_loader, verbosity=1)
+    # print("adversarial attack test result for sum CLIP :")
+    # attack = adversarial_attack(model, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
+    # attack_on_standard = adversarial_attack(model_standard, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
+    # test_result = trainer.test_step(test_loader, attack = attack, verbosity=1)
+    # print("adversarial attack test result for standard CLIP :")
+    # test_result = trainer_standard.test_step(test_loader, attack = attack_on_standard, verbosity=1)
     # for i in range(num_total_iters):
     #     trainer.train_step()
     #     if i % 1 == 0:
@@ -524,11 +579,6 @@ if __name__ == "__main__":
     #         print("random lip constant : ", trainer.random_lip_constant)
     #         print("saved basic loss : ", trainer.saved_basic_loss)
 
-    # sizes = [784, 200, 80, 10]
-    # model = fully_connected(sizes, "ReLU")
-    # model = model.to(device)
-    # trainer_standard = Trainer(model, xy_loader, 100, loss =  F.cross_entropy, lamda=.7, lr=0.001, adversarial_name="SGD", num_iters=7, CLIP = "standard")#, backtracking=0.9)
-    # num_total_iters = 100
     # for i in range(num_total_iters):
     #     trainer_standard.train_step()
     #     if i % 1 == 0:
@@ -543,5 +593,9 @@ if __name__ == "__main__":
     # test_result = trainer.test_step(test_loader, verbosity=1)
     # print("test result for standard CLIP :")
     # test_result = trainer_standard.test_step(test_loader, verbosity=1)
+    # print("adversarial attack test result for sum CLIP :")
+    # test_result = trainer.test_step(test_loader, attack = attack, verbosity=1)
+    # print("adversarial attack test result for standard CLIP :")
+    # test_result = trainer_standard.test_step(test_loader, attack = attack_on_standard, verbosity=1)
     
 
