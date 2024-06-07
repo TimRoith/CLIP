@@ -19,8 +19,7 @@ XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
 
 xy_mean =lambda x : [torch.sum(xy[:,1])/len(xy[:,1]) for _ in x]
 
-model = fully_connected([1, 50, 100, 50, 1], "ReLU")
-model = model.to(device)
+
 num_total_iters = 100
 
 #lambda_max = 100000
@@ -40,7 +39,8 @@ max_lip = 0
 max_loss = 0
 max_mse = 0
 for lam in lamda:
-    trainers = [Trainer(model, xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5) for _ in range(num_trainer)] #, backtracking=0.9)
+    model = [fully_connected([1, 50, 100, 50, 1], "ReLU") for _ in range(num_trainer)]
+    trainers = [Trainer(model[i], xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5) for i in range(num_trainer)] #, backtracking=0.9)
     y_mean = None
     train_acc = 0
     train_loss = 0
