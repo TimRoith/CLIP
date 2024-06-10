@@ -40,7 +40,7 @@ max_loss = 0
 max_mse = 0
 for lam in lamda:
     model = [fully_connected([1, 50, 100, 50, 1], "ReLU") for _ in range(num_trainer)]
-    trainers = [Trainer(model[i], xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5) for i in range(num_trainer)] #, backtracking=0.9)
+    trainers = [Trainer(model[i], xy_loader, 100, lamda=lam, lr=0.001, adversarial_name="SGD", num_iters=5, min_accuracy=0.9, CLIP_estimation="sum", iter_warm_up=20, change_lamda_in=False, epsilon=5e-3) for i in range(num_trainer)] #, backtracking=0.9)
     y_mean = None
     train_acc = 0
     train_loss = 0

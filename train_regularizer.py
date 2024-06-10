@@ -145,7 +145,7 @@ class All_MNIST:
         return train_loader, valid_loader, test_loader
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None):
+    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None, change_lamda_in = True):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -160,11 +160,12 @@ class Trainer:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.lamda = lamda
         self.lamda_stuck = lamda_stuck
-        self.maximal_lamda = lamda*2
+        self.maximal_lamda = lamda*4
         self.minimal_lamda = lamda*0.25
         self.dlamda = lamda*percent_of_lamda
         # self.saved_min_acc = min_accuracy
         self.min_acc = min_accuracy
+        self.change_lamda_in = change_lamda_in
         self.epsilon = epsilon
         self.train_acc = 0.0
         self.train_loss = 0.0
@@ -331,16 +332,16 @@ class Trainer:
             else:
                 self.train_acc += (logits.max(1)[1] == y).sum().item()
                 self.tot_steps += y.shape[0]
-            if self.min_acc is not None : 
+            if self.min_acc is not None and self.change_lamda_in: 
                 if self.train_acc > self.min_acc*self.tot_steps:
                     self.warm_up = False
                     self.lamda = min(self.lamda + self.dlamda, self.maximal_lamda)
-                    self.dlamda = self.dlamda*0.95
+                    self.dlamda = self.dlamda*0.99
                     # weight = 0.6
                     # self.min_acc = (self.train_acc*weight + self.saved_min_acc*(2-weight))/2
                 elif not self.warm_up:
                      self.lamda = max(self.lamda - self.dlamda, self.minimal_lamda)
-                     self.dlamda = self.dlamda*0.95
+                     self.dlamda = self.dlamda*0.99
                     #  if self.lamda == self.minimal_lamda:
                     #      self.min_acc = self.saved_min_acc
             elif self.iter_warm_up == 0:
@@ -355,6 +356,12 @@ class Trainer:
         v_rand = torch.rand_like(x)*torch.rand(1).item()*10
         self.random_lip_constant = self.lipschitz(u_rand, v_rand).item()
         self.train_acc /= self.tot_steps
+        if not self.change_lamda_in and self.train_acc > self.min_acc:
+            self.lamda = min(self.lamda + self.dlamda, self.maximal_lamda)
+            self.dlamda = self.dlamda*0.95
+        elif not self.change_lamda_in :
+            self.lamda = max(self.lamda - self.dlamda, self.minimal_lamda)
+            self.dlamda = self.dlamda*0.95
     
     def adversarial_trainer_step(self):
         # train phase
@@ -677,13 +684,13 @@ if __name__ == "__main__":
     model = model.to(device)
     data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
     xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
-    trainer = Trainer(model, xy_loader, 100, lamda=lamda, loss =  F.cross_entropy, lr=0.001, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter)#, backtracking=0.9)
+    trainer = Trainer(model, xy_loader, 100, lamda=lamda, loss =  F.cross_entropy, lr=0.001, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter, change_lamda_in=False)#, backtracking=0.9)
     model_max = fully_connected(sizes, "ReLU")
     model_max = model_max.to(device)
-    trainer_max = Trainer(model_max, xy_loader, 100, lamda=lamda, lr=0.001, loss =  F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter)#, backtracking=0.9)
+    trainer_max = Trainer(model_max, xy_loader, 100, lamda=lamda, lr=0.001, loss =  F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="max", iter_warm_up=warm_up_iter, change_lamda_in=False)#, backtracking=0.9)
     model_adv = fully_connected(sizes, "ReLU")
     model_adv = model_adv.to(device)
-    trainer_adv = Trainer(model_adv, xy_loader, 100, lamda=lamda, lr=0.001, loss =  F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, iter_warm_up=warm_up_iter)#, backtracking=0.9)
+    trainer_adv = Trainer(model_adv, xy_loader, 100, lr=0.001, loss =  F.cross_entropy, min_accuracy=min_accuracy, iter_warm_up=warm_up_iter)#, backtracking=0.9)
 
     print("test result for sum CLIP :")
     test_result = trainer.test_step(test_loader, verbosity=1)
