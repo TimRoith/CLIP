@@ -561,7 +561,7 @@ class adversarial_attack:
         elif attack_type == "fgsm_attack":
             self.attack = at.fgsm(self.loss, epsilon=self.epsilon, x_min=self.xmin, x_max=self.xmax)
         elif attack_type == "pgd_attack":
-            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, alpha=None, alpha_mul=1.0, norm_type="l2")
+            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, epsilon=self.epsilon, alpha=None, alpha_mul=1.0, norm_type="l2")
         else:
             raise ValueError("Attack type not defined")
     
@@ -571,7 +571,7 @@ class adversarial_attack:
         elif self.attack_type == "fgsm_attack":
             self.attack = at.fgsm(self.loss, epsilon=self.epsilon, x_min=self.xmin, x_max=self.xmax)
         elif self.attack_type == "pgd_attack":
-            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, alpha=None, alpha_mul=1.0, norm_type="l2")
+            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, epsilon=self.epsilon, alpha=None, alpha_mul=1.0, norm_type="l2")
         else:
             raise ValueError("Attack type not defined")
 
