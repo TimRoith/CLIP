@@ -145,7 +145,7 @@ class All_MNIST:
         return train_loader, valid_loader, test_loader
 
 class Trainer:
-    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="gradient_ascent", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None, change_lamda_in = True):
+    def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="SGD", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None, change_lamda_in = True):
         self.device = device
         self.model = model.to(self.device)
         self.train_loader = train_loader
@@ -565,6 +565,16 @@ class adversarial_attack:
         else:
             raise ValueError("Attack type not defined")
     
+    def update_attack(self):
+        if self.attack_type == "gauss_attack":
+            self.attack = at.gauss_attack(nl=self.nl, x_min=self.xmin, x_max=self.xmax)
+        elif self.attack_type == "fgsm_attack":
+            self.attack = at.fgsm(self.loss, epsilon=self.epsilon, x_min=self.xmin, x_max=self.xmax)
+        elif self.attack_type == "pgd_attack":
+            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, alpha=None, alpha_mul=1.0, norm_type="l2")
+        else:
+            raise ValueError("Attack type not defined")
+
     def __call__(self, x, y):
         return self.attack(self.model, x, y)
 
@@ -697,7 +707,7 @@ if __name__ == "__main__":
     print("test result for max CLIP :")
     test_result = trainer_max.test_step(test_loader, verbosity=1)
     print("adversarial attack test result for sum CLIP :")
-    attack = adversarial_attack(model, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
+    attack = adversarial_attack(model, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=1.0, xmin=-1, xmax=1, num_iters=100)
     attack_on_max = adversarial_attack(model_max, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
     test_result = trainer.test_step(test_loader, attack = attack, verbosity=1)
     print("adversarial attack test result for max CLIP :")
@@ -752,4 +762,25 @@ if __name__ == "__main__":
     print("adversarial attack test result for adversarial training :")
     test_result = trainer_adv.test_step(test_loader, attack = attack, verbosity=1)
     
+    espilon_list = torch.logspace(-3, 0, 50)
+    adv_acc = []
+    adv_acc_max = []
+    adv_acc_adv = []
+    for epsilon in espilon_list:
+        attack.epsilon = epsilon
+        attack_on_max.epsilon = epsilon
+        attack.update_attack()
+        attack_on_max.update_attack()
+        adv_acc.append(trainer.test_step(test_loader, attack = attack, verbosity=0)['test_acc'])
+        adv_acc_max.append(trainer_max.test_step(test_loader, attack = attack_on_max, verbosity=0)['test_acc'])
+        adv_acc_adv.append(trainer_adv.test_step(test_loader, attack = attack, verbosity=0)['test_acc'])
 
+    fig, ax = plt.subplots(1,1)
+    ax.plot(espilon_list, adv_acc, label="sum CLIP")
+    ax.plot(espilon_list, adv_acc_max, label="max CLIP")
+    ax.plot(espilon_list, adv_acc_adv, label="adversarial training")
+    ax.set_xscale('log')
+    ax.set_xlabel('epsilon')
+    ax.set_ylabel('accuracy')
+    ax.legend()
+    plt.show()
