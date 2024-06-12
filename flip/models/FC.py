@@ -8,9 +8,9 @@ class Flatten(nn.Module):
         else:
             return x
 
-class fully_connected(nn.Module):
+class FC(nn.Module):
     def __init__(self, sizes, act_fun, mean = 0.0, std = 1.0):
-        super(fully_connected, self).__init__()
+        super().__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.act_fn = get_activation_function(act_fun)
         self.mean = mean

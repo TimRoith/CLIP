@@ -11,7 +11,7 @@ CFG = cfg(data=dataset(), model=model())
 
 model = load_model.load(CFG)
 dataloader= load_MNIST_test(CFG)
-attack = pgd(proj='linf', max_iters=100, epsilon=0.1)
+attack = pgd(proj='linf', max_iters=10, epsilon=0.1)
 
 #%%
 def eval_acc(model, x, y):
