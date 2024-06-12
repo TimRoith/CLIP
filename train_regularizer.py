@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import adversarial_attacks as at
+import attacks as att
 import random
 import time
 import os
@@ -572,7 +573,7 @@ class adversarial_attack:
         elif self.attack_type == "fgsm_attack":
             self.attack = at.fgsm(self.loss, epsilon=self.epsilon, x_min=self.xmin, x_max=self.xmax)
         elif self.attack_type == "pgd_attack":
-            self.attack = at.pgd(self.loss, x_min=self.xmin, x_max=self.xmax, attack_iters=self.num_iters, restarts=1, epsilon=self.epsilon, alpha=None, alpha_mul=1.0, norm_type="l2")
+            self.attack = att.pgd(loss = self.loss, x_range=(self.xmin,self.xmax), max_iters=self.num_iters, epsilon=self.epsilon, proj="l2")
         else:
             raise ValueError("Attack type not defined")
 
@@ -671,7 +672,7 @@ def train_and_save_models():
 
     print("Models saved successfully!")
 
-def load_models_and_test():
+def load_models_and_test(epsilon_test=False):
     # Load data
     xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
 
@@ -721,40 +722,79 @@ def load_models_and_test():
     test_result = trainer_adv.test_step(test_loader, attack=attack, verbosity=1)
 
     # Visualization and further testing
-    image, label = random.choice(test_loader.dataset)
+    root_num_images = 3
 
-    # Plot the image
-    plt.imshow(image.squeeze(), cmap='gray')
-    plt.title(f"True Label: {label}")
-    plt.axis('off')
+    # Create a grid of subplots
+    fig, axs = plt.subplots(root_num_images, root_num_images, figsize=(10, 10))
+
+    # Iterate over the images and labels
+    for i in range(root_num_images**2):
+        image, label = random.choice(test_loader.dataset)
+        # Plot the image
+        axs[i // 3, i % 3].imshow(image.squeeze(), cmap='gray')
+        axs[i // 3, i % 3].set_title(f"True Label: {label} & Predicted Label: {torch.argmax(model(image.unsqueeze(0).to(device)).squeeze()).item()}")
+        axs[i // 3, i % 3].axis('off')
+
+    # Show the plot
+    plt.tight_layout()
     plt.show()
 
-    output = model(image.unsqueeze(0).to(device))
-    predicted_label = torch.argmax(output).item()
-    print(f"CLIP Predicted Label: {predicted_label}")
+    root_num_images = 3
+    num_misclassified = 0
+    num_checked_data = 0
 
-    epsilon_list = torch.logspace(-3, 0, 50)
-    adv_acc = []
-    adv_acc_max = []
-    adv_acc_adv = []
-    for epsilon in epsilon_list:
-        attack.epsilon = epsilon
-        attack_on_max.epsilon = epsilon
-        attack.update_attack()
-        attack_on_max.update_attack()
-        adv_acc.append(trainer.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
-        adv_acc_max.append(trainer_max.test_step(test_loader, attack=attack_on_max, verbosity=0)['test_acc'])
-        adv_acc_adv.append(trainer_adv.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
+    # Create a grid of subplots
+    fig, axs = plt.subplots(root_num_images, root_num_images, figsize=(10, 10))
 
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(epsilon_list, adv_acc, label="sum CLIP")
-    ax.plot(epsilon_list, adv_acc_max, label="max CLIP")
-    ax.plot(epsilon_list, adv_acc_adv, label="adversarial training")
-    ax.set_xscale('log')
-    ax.set_xlabel('epsilon')
-    ax.set_ylabel('accuracy')
-    ax.legend()
+    # Iterate over the images and labels
+    for image, label in test_loader.dataset:
+        predicted_label = torch.argmax(model(image.unsqueeze(0).to(device)).squeeze()).item()
+        num_checked_data += 1
+        
+        # Check if the image is misclassified
+        if predicted_label != label:
+            # Plot the misclassified image
+            # axs[num_misclassified // 3, num_misclassified % 3].imshow(image.squeeze(), cmap='gray')
+            # axs[num_misclassified // 3, num_misclassified % 3].set_title(f"True Label: {label} & Predicted Label: {predicted_label}")
+            # axs[num_misclassified // 3, num_misclassified % 3].axis('off')
+            num_misclassified += 1
+        
+        # # Check if we have found 9 misclassified images
+        # if num_misclassified == root_num_images**2:
+        #     break
+
+    # Show the plot
+    plt.tight_layout()
     plt.show()
+
+    # Check if all data has been checked
+    if num_checked_data == len(test_loader.dataset):
+        print("Number of misclassified data:", num_misclassified)
+        print("Total number of data:", num_checked_data)
+
+    if epsilon_test:
+        epsilon_list = torch.logspace(-3, 0, 50)
+        adv_acc = []
+        adv_acc_max = []
+        adv_acc_adv = []
+        for epsilon in epsilon_list:
+            attack.epsilon = epsilon
+            attack_on_max.epsilon = epsilon
+            attack.update_attack()
+            attack_on_max.update_attack()
+            adv_acc.append(trainer.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
+            adv_acc_max.append(trainer_max.test_step(test_loader, attack=attack_on_max, verbosity=0)['test_acc'])
+            adv_acc_adv.append(trainer_adv.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
+
+        fig, ax = plt.subplots(1, 1)
+        ax.plot(epsilon_list, adv_acc, label="sum CLIP")
+        ax.plot(epsilon_list, adv_acc_max, label="max CLIP")
+        ax.plot(epsilon_list, adv_acc_adv, label="adversarial training")
+        ax.set_xscale('log')
+        ax.set_xlabel('epsilon')
+        ax.set_ylabel('accuracy')
+        ax.legend()
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -815,9 +855,9 @@ if __name__ == "__main__":
     data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
 
     # File paths for saving models
-    model_sum_clip_path = 'model_sum_clip.pth'
-    model_max_clip_path = 'model_max_clip.pth'
-    model_adv_training_path = 'model_adv_training.pth'
+    model_sum_clip_path = '/home/bernas/VSC/model/model_sum_clip.pth'
+    model_max_clip_path = '/home/bernas/VSC/model/model_max_clip.pth'
+    model_adv_training_path = '/home/bernas/VSC/model/model_adv_training.pth'
     if training :
         train_and_save_models()
     if testing:
