@@ -20,11 +20,11 @@ class Polynom:
         x = x**d
         return self.scaling * torch.sum(self.coeffs[:,None] * x, dim=0)
     
-    def createdata(self, x, sigma=0.1):
+    def createdata(self, x, sigma=0.1, batch_size=32):
         y = self(x) + torch.randn_like(x) * sigma
         xy = torch.stack((x, y), dim=1)
         dataset = torch.utils.data.TensorDataset(xy[:, 0], xy[:, 1])
-        loader = torch.utils.data.DataLoader(dataset, batch_size=100, shuffle=True)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
         return loader, xy
 
     def plot(self, ax=None, num_pts=100, xmin=-1, xmax=1):
@@ -76,7 +76,8 @@ class Trainer:
             # ---------------------------------------------------------------------
 
             # adversarial update on the Lipschitz set
-            adv = self.adversarial(x)
+            x_adv = torch.linspace(-3, 3, 40)
+            adv = self.adversarial(x_adv)
             for _ in range(self.num_iters):
                 adv.step()
             u, v = adv.u, adv.v
@@ -147,39 +148,45 @@ def scattered_points(num_pts=100, xmin=-1, xmax=1, percent_loss=0.3, random=True
     else:
         if percent_loss > 0.99:
             raise ValueError("percent_loss should be less than 0.99 for fixed loss of data")
-        x_mid = (xmin + xmax) / 2
+        x_mid  = (xmin + xmax) / 2
         x_down = torch.linspace(xmin, x_mid - (x_mid - xmin) * percent_loss, num_pts//2)
-        x_up = torch.linspace(x_mid + (xmax - x_mid) * percent_loss, xmax, num_pts//2)
-        x = torch.cat([x_down, x_up])
+        x_up   = torch.linspace(x_mid + (xmax - x_mid) * percent_loss, xmax, num_pts//2)
+        x = torch.cat([x_down,  x_up])
     return x
 
 if __name__ == "__main__":
     plt.close('all')
     fig, ax = plt.subplots(1,)
     coeffs = torch.tensor([0.5,0.01,-0.,0.,0.,0.,1]).to(device)
-    polynom = Polynom(coeffs, scaling=0.00005)
+    polynom = Polynom(coeffs, scaling=0.0005)
     xmin,xmax=(-3,3)
     polynom.plot(xmin=xmin,xmax=xmax)
     x = scattered_points(num_pts=50, xmin=xmin, xmax=xmax, percent_loss=0.75, random=False).to(device)
-    xy_loader = polynom.createdata(x,sigma=0.0)[0]
+    xy_loader = polynom.createdata(x,sigma=0.01)[0]
     XY = torch.stack([xy_loader.dataset.tensors[i] for i in [0,1]])
     
-    ax.set_ylim(XY[1, :].min()-0.01, XY[1, :].max()+0.01)
+    r = 0.3* (XY[1, :].max() - XY[1, :].min())
+    ax.set_ylim(XY[1, :].min()-r, XY[1, :].max()+r)
     
-    model = fully_connected([1, 50, 100, 50, 1], "ReLU")
+    model = fully_connected([1, 500, 300, 200, 1], "sigmoid")
     model = model.to(device)
+    
+    for m in model.parameters():
+        if isinstance(m, nn.Linear):
+            m.weight.data = 300*torch.randn_like(m.weight.data)
+            m.bias.data = 3*torch.randn_like(m.bias.data)
+        
 
     ax.plot(x.cpu(),model(x).cpu().detach())
-    trainer = Trainer(model, xy_loader, 100, lamda=100000.1, lr=0.001, adversarial_name="SGD", num_iters=10)
+    trainer = Trainer(model, xy_loader, 100, lamda=.0, lr=0.005, adversarial_name="SGD", num_iters=0)
     line = trainer.plot(ax=ax, xmin=xmin,xmax=xmax)
     #plt.show()
-    num_total_iters = 300
+    num_total_iters = 3000
     ax.scatter(XY[0,:].cpu(),XY[1,:].cpu())
     for i in range(num_total_iters):
         trainer.train_step()
         if i % 1 == 0:
             print(i)
-            print(model.layers[1].weight)
             #ax.set_title('Iteration: ' + str(i))
             print("train accuracy : ", trainer.train_acc)
             print("train loss : ", trainer.train_loss)
