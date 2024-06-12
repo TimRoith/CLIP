@@ -1,5 +1,6 @@
 import torch
 from .CNN import CNN
+from .FC import FC
 
 
 def load_CNN(cfg):
@@ -10,6 +11,13 @@ def load_CNN(cfg):
     model.eval()
     return model
 
+def load_FC(cfg):
+    model = FC(sizes = cfg.model.sizes, act_fun = cfg.model.act_fun, 
+                       mean = cfg.data.mean, std = cfg.data.std).to(cfg.device)
+    name = getattr(cfg.model, 'file_name', 'fc.pt')
+    model.load_state_dict(torch.load(cfg.model.path + name, map_location=cfg.device))
+    model.eval()
+    return model
 
 model_dict = {'CNN': load_CNN,}
 
