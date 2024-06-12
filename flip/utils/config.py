@@ -12,7 +12,7 @@ class dataset:
 
 
 @dataclass
-class model:
+class model_attributes:
     name: str = 'CNN'
     path: str = '../../weights/'
     file_name: str = 'cnn.pt'

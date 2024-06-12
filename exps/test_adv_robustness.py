@@ -2,12 +2,12 @@ import torch
 from flip.models import load_model
 from flip.attacks import pgd
 from flip.load_data import load_MNIST_test
-from flip.utils.config import cfg, dataset, model
+from flip.utils.config import cfg, dataset, model_attributes
 
 
 
 
-CFG = cfg(data=dataset(), model=model())
+CFG = cfg(data=dataset(), model=model_attributes())
 
 model = load_model.load(CFG)
 dataloader= load_MNIST_test(CFG)
