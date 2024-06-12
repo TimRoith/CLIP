@@ -15,6 +15,9 @@ class dataset:
 class model:
     name: str = 'CNN'
     path: str = '../../weights/'
+    file_name: str = 'cnn.pt'
+    size: list = None
+    act_fun: str = 'ReLU'
     
 @dataclass
 class cfg:
