@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import adversarial_attacks as at
+import random
 import time
 import os
 
@@ -637,6 +638,124 @@ def linear_points(num_pts=100, xmin=-1, xmax=1, dim=1, coordinate=0):
             x[i, coordinate] = x_i[i]
         return x_i, x
     
+def train_and_save_models():
+    # Load data
+    xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
+
+    # Create models
+    model = fully_connected(sizes, "ReLU").to(device)
+    model_max = fully_connected(sizes, "ReLU").to(device)
+    model_adv = fully_connected(sizes, "ReLU").to(device)
+
+    # Create trainers
+    trainer = Trainer(model, xy_loader, 100, lamda=lamda, loss=F.cross_entropy, lr=0.001, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter, change_lamda_in=False)
+    trainer_max = Trainer(model_max, xy_loader, 100, lamda=lamda, lr=0.001, loss=F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="max", iter_warm_up=warm_up_iter, change_lamda_in=False)
+    trainer_adv = Trainer(model_adv, xy_loader, 100, lr=0.001, loss=F.cross_entropy, min_accuracy=min_accuracy, iter_warm_up=warm_up_iter)
+
+    # Train models
+    for i in range(num_total_iters):
+        trainer.train_step()
+        trainer_max.train_step()
+        trainer_adv.adversarial_trainer_step()
+        
+        if i % 1 == 0:
+            print(f"Epoch {i}")
+            print("Sum CLIP: Train accuracy:", trainer.train_acc, "Train loss:", trainer.train_loss)
+            print("Max CLIP: Train accuracy:", trainer_max.train_acc, "Train loss:", trainer_max.train_loss)
+            print("Adversarial Training: Train accuracy:", trainer_adv.train_acc, "Train loss:", trainer_adv.train_loss)
+
+    # Save models
+    torch.save(model.state_dict(), model_sum_clip_path)
+    torch.save(model_max.state_dict(), model_max_clip_path)
+    torch.save(model_adv.state_dict(), model_adv_training_path)
+
+    print("Models saved successfully!")
+
+def load_models_and_test():
+    # Load data
+    xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
+
+    # Create models
+    model = fully_connected(sizes, "ReLU").to(device)
+    model_max = fully_connected(sizes, "ReLU").to(device)
+    model_adv = fully_connected(sizes, "ReLU").to(device)
+
+    # Load saved models
+    if os.path.exists(model_sum_clip_path):
+        model.load_state_dict(torch.load(model_sum_clip_path))
+        print("Loaded sum CLIP model.")
+    else:
+        print("sum CLIP model file not found.")
+    
+    if os.path.exists(model_max_clip_path):
+        model_max.load_state_dict(torch.load(model_max_clip_path))
+        print("Loaded max CLIP model.")
+    else:
+        print("max CLIP model file not found.")
+    
+    if os.path.exists(model_adv_training_path):
+        model_adv.load_state_dict(torch.load(model_adv_training_path))
+        print("Loaded adversarial training model.")
+    else:
+        print("Adversarial training model file not found.")
+
+    # Create trainers
+    trainer = Trainer(model, xy_loader, 100, lamda=lamda, loss=F.cross_entropy, lr=0.001, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter, change_lamda_in=False)
+    trainer_max = Trainer(model_max, xy_loader, 100, lamda=lamda, lr=0.001, loss=F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="max", iter_warm_up=warm_up_iter, change_lamda_in=False)
+    trainer_adv = Trainer(model_adv, xy_loader, 100, lr=0.001, loss=F.cross_entropy, min_accuracy=min_accuracy, iter_warm_up=warm_up_iter)
+
+    # Testing models
+    print("Test result for sum CLIP:")
+    test_result = trainer.test_step(test_loader, verbosity=1)
+    print("Test result for max CLIP:")
+    test_result = trainer_max.test_step(test_loader, verbosity=1)
+    print("Adversarial attack test result for sum CLIP:")
+    attack = adversarial_attack(model, loss=F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=1.0, xmin=-1, xmax=1, num_iters=100)
+    attack_on_max = adversarial_attack(model_max, loss=F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
+    test_result = trainer.test_step(test_loader, attack=attack, verbosity=1)
+    print("Adversarial attack test result for max CLIP:")
+    test_result = trainer_max.test_step(test_loader, attack=attack_on_max, verbosity=1)
+    print("Test result for adversarial training:")
+    test_result = trainer_adv.test_step(test_loader, verbosity=1)
+    print("Adversarial attack test result for adversarial training:")
+    test_result = trainer_adv.test_step(test_loader, attack=attack, verbosity=1)
+
+    # Visualization and further testing
+    image, label = random.choice(test_loader.dataset)
+
+    # Plot the image
+    plt.imshow(image.squeeze(), cmap='gray')
+    plt.title(f"True Label: {label}")
+    plt.axis('off')
+    plt.show()
+
+    output = model(image.unsqueeze(0).to(device))
+    predicted_label = torch.argmax(output).item()
+    print(f"CLIP Predicted Label: {predicted_label}")
+
+    epsilon_list = torch.logspace(-3, 0, 50)
+    adv_acc = []
+    adv_acc_max = []
+    adv_acc_adv = []
+    for epsilon in epsilon_list:
+        attack.epsilon = epsilon
+        attack_on_max.epsilon = epsilon
+        attack.update_attack()
+        attack_on_max.update_attack()
+        adv_acc.append(trainer.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
+        adv_acc_max.append(trainer_max.test_step(test_loader, attack=attack_on_max, verbosity=0)['test_acc'])
+        adv_acc_adv.append(trainer_adv.test_step(test_loader, attack=attack, verbosity=0)['test_acc'])
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(epsilon_list, adv_acc, label="sum CLIP")
+    ax.plot(epsilon_list, adv_acc_max, label="max CLIP")
+    ax.plot(epsilon_list, adv_acc_adv, label="adversarial training")
+    ax.set_xscale('log')
+    ax.set_xlabel('epsilon')
+    ax.set_ylabel('accuracy')
+    ax.legend()
+    plt.show()
+
 
 if __name__ == "__main__":
     # plt.close('all')
@@ -685,102 +804,21 @@ if __name__ == "__main__":
     # plt.show()
 
 ############################################################################################################################################################################
+    # Model configuration
+    training = False
+    testing = True
     sizes = [784, 200, 80, 10]
     lamda = 0.5
     num_total_iters = 50
     min_accuracy = 0.9
-    warm_up_iter = num_total_iters//4
-    model = fully_connected(sizes, "ReLU")
-    model = model.to(device)
+    warm_up_iter = num_total_iters // 4
     data_file = "/home/bernas/VSC/dataset_MNIST/MNIST"
-    xy_loader, _, test_loader = All_MNIST(data_file, download=False, data_set="MNIST", batch_size=100, train_split=0.9, num_workers=1)()
-    trainer = Trainer(model, xy_loader, 100, lamda=lamda, loss =  F.cross_entropy, lr=0.001, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="sum", iter_warm_up=warm_up_iter, change_lamda_in=False)#, backtracking=0.9)
-    model_max = fully_connected(sizes, "ReLU")
-    model_max = model_max.to(device)
-    trainer_max = Trainer(model_max, xy_loader, 100, lamda=lamda, lr=0.001, loss =  F.cross_entropy, adversarial_name="Adam", num_iters=5, min_accuracy=min_accuracy, CLIP_estimation="max", iter_warm_up=warm_up_iter, change_lamda_in=False)#, backtracking=0.9)
-    model_adv = fully_connected(sizes, "ReLU")
-    model_adv = model_adv.to(device)
-    trainer_adv = Trainer(model_adv, xy_loader, 100, lr=0.001, loss =  F.cross_entropy, min_accuracy=min_accuracy, iter_warm_up=warm_up_iter)#, backtracking=0.9)
 
-    print("test result for sum CLIP :")
-    test_result = trainer.test_step(test_loader, verbosity=1)
-    print("test result for max CLIP :")
-    test_result = trainer_max.test_step(test_loader, verbosity=1)
-    print("adversarial attack test result for sum CLIP :")
-    attack = adversarial_attack(model, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=1.0, xmin=-1, xmax=1, num_iters=100)
-    attack_on_max = adversarial_attack(model_max, loss = F.cross_entropy, attack_type="pgd_attack", nl=0.1, epsilon=0.1, xmin=-1, xmax=1, num_iters=100)
-    test_result = trainer.test_step(test_loader, attack = attack, verbosity=1)
-    print("adversarial attack test result for max CLIP :")
-    test_result = trainer_max.test_step(test_loader, attack = attack_on_max, verbosity=1)
-    print("test result for adversarial training :")
-    test_result = trainer_adv.test_step(test_loader, verbosity=1)
-    print("adversarial attack test result for adversarial training :")
-    test_result = trainer_adv.test_step(test_loader, attack = attack, verbosity=1)
-    for i in range(num_total_iters):
-        trainer.train_step()
-        if i % 1 == 0:
-            print(i)
-            print("train accuracy : ", trainer.train_acc)
-            print("train loss : ", trainer.train_loss)
-            print("train lip loss : ", trainer.train_lip_loss)
-            print("random lip constant : ", trainer.random_lip_constant)
-            print("saved basic loss : ", trainer.saved_basic_loss)
-            print("current lamda : ", trainer.lamda if not trainer.warm_up else 0)
-
-    for i in range(num_total_iters):
-        trainer_max.train_step()
-        if i % 1 == 0:
-            print(i)
-            print("train accuracy : ", trainer_max.train_acc)
-            print("train loss : ", trainer_max.train_loss)
-            print("train lip loss : ", trainer_max.train_lip_loss)
-            print("random lip constant : ", trainer_max.random_lip_constant)
-            print("saved basic loss : ", trainer_max.saved_basic_loss)
-            print("current lamda : ", trainer.lamda if not trainer.warm_up else 0)
-    
-    for i in range(num_total_iters):
-        trainer_adv.adversarial_trainer_step()
-        if i % 1 == 0:
-            print(i)
-            print("train accuracy : ", trainer_adv.train_acc)
-            print("train loss : ", trainer_adv.train_loss)
-            print("train lip loss : ", trainer_adv.train_lip_loss)
-            print("random lip constant : ", trainer_adv.random_lip_constant)
-            print("saved basic loss : ", trainer_adv.saved_basic_loss)
-            print("current lamda : ", trainer.lamda if not trainer.warm_up else 0)
-
-    print("test result for sum CLIP :")
-    test_result = trainer.test_step(test_loader, verbosity=1)
-    print("test result for max CLIP :")
-    test_result = trainer_max.test_step(test_loader, verbosity=1)
-    print("adversarial attack test result for sum CLIP :")
-    test_result = trainer.test_step(test_loader, attack = attack, verbosity=1)
-    print("adversarial attack test result for max CLIP :")
-    test_result = trainer_max.test_step(test_loader, attack = attack_on_max, verbosity=1)
-    print("test result for adversarial training :")
-    test_result = trainer_adv.test_step(test_loader, verbosity=1)
-    print("adversarial attack test result for adversarial training :")
-    test_result = trainer_adv.test_step(test_loader, attack = attack, verbosity=1)
-    
-    espilon_list = torch.logspace(-3, 0, 50)
-    adv_acc = []
-    adv_acc_max = []
-    adv_acc_adv = []
-    for epsilon in espilon_list:
-        attack.epsilon = epsilon
-        attack_on_max.epsilon = epsilon
-        attack.update_attack()
-        attack_on_max.update_attack()
-        adv_acc.append(trainer.test_step(test_loader, attack = attack, verbosity=0)['test_acc'])
-        adv_acc_max.append(trainer_max.test_step(test_loader, attack = attack_on_max, verbosity=0)['test_acc'])
-        adv_acc_adv.append(trainer_adv.test_step(test_loader, attack = attack, verbosity=0)['test_acc'])
-
-    fig, ax = plt.subplots(1,1)
-    ax.plot(espilon_list, adv_acc, label="sum CLIP")
-    ax.plot(espilon_list, adv_acc_max, label="max CLIP")
-    ax.plot(espilon_list, adv_acc_adv, label="adversarial training")
-    ax.set_xscale('log')
-    ax.set_xlabel('epsilon')
-    ax.set_ylabel('accuracy')
-    ax.legend()
-    plt.show()
+    # File paths for saving models
+    model_sum_clip_path = 'model_sum_clip.pth'
+    model_max_clip_path = 'model_max_clip.pth'
+    model_adv_training_path = 'model_adv_training.pth'
+    if training :
+        train_and_save_models()
+    if testing:
+        load_models_and_test()
