@@ -160,10 +160,10 @@ class FLIPTrainer(Trainer):
     def lamda_schedule(self):
         acc = self.hist['acc'][-1].item()
         if acc > self.min_acc:
-            self.lamda = max(self.lamda + self.dlamda, self.lamda_bound[1])
+            self.lamda = min(self.lamda + self.dlamda, self.lamda_bound[1])
             self.dlamda = self.dlamda*0.99
         else:
-            self.lamda = min(self.lamda - self.dlamda, self.lamda_bound[0])
+            self.lamda = max(self.lamda - self.dlamda, self.lamda_bound[0])
             self.dlamda = self.dlamda*0.99
         
         
