@@ -38,6 +38,18 @@ def load_MNIST_test(cfg):
     test_loader = DataLoader(test, batch_size=cfgd.batch_size, **loader_kwargs)
     return test_loader
 
+
+def load_MNIST(cfg):
+    cfgd = cfg.data
+    cfgd.shape = [1, 28, 28]
+    transform = transforms.Compose([transforms.ToTensor()])
+    loader_kwargs = {'pin_memory':True, 'num_workers':cfgd.num_workers}
+    test = datasets.MNIST(cfgd.path, train=True, download=cfgd.download, transform=transform)
+    loader = DataLoader(test, batch_size=cfgd.batch_size, **loader_kwargs)
+    return loader
+
+
+
 # get center crop
 def load_image(path):
     image = PIL.Image.open(path)

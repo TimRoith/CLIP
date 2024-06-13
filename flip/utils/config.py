@@ -16,7 +16,7 @@ class model_attributes:
     name: str = 'CNN'
     path: str = '../../weights/'
     file_name: str = 'cnn.pt'
-    size: list = None
+    sizes: list = None
     act_fun: str = 'ReLU'
     
 @dataclass
