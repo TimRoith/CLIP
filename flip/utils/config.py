@@ -22,5 +22,5 @@ class model_attributes:
 @dataclass
 class cfg:
     data: dataset
-    model: model
+    model: model_attributes
     device: str = 'cpu'

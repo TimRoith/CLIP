@@ -19,7 +19,7 @@ def load_FC(cfg):
     model.eval()
     return model
 
-model_dict = {'CNN': load_CNN,}
+model_dict = {'CNN': load_CNN, 'FC': load_FC}
 
 def load(cfg):
     name = cfg.model.name

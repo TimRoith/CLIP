@@ -8,6 +8,10 @@ from flip.utils.config import cfg, dataset, model_attributes
 
 
 CFG = cfg(data=dataset(), model=model_attributes())
+CFG.model.name = 'FC'
+CFG.model.sizes = [784, 200, 80, 10]
+CFG.model.act_fun = 'ReLU'
+CFG.model.file_name = 'model_sum_clip.pth'
 
 model = load_model.load(CFG)
 dataloader= load_MNIST_test(CFG)
@@ -22,3 +26,4 @@ x,y = next(iter(dataloader))
 attack(model, x, y)
 delta = attack.delta
 eval_acc(model, x+delta, y)
+print('Accuracy: ', eval_acc(model, x+delta, y)/len(y))
