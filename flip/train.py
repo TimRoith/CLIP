@@ -21,6 +21,7 @@ class Trainer:
         self.verbosity = verbosity
         self.epochs = epochs
         self.lamda = None
+        self.hist= {'acc':[], 'loss':[]}
         
     
         self.loss = nn.CrossEntropyLoss() if loss is None else loss
@@ -150,14 +151,14 @@ class FLIPTrainer(Trainer):
                          **kwargs)
         self.num_iters = num_iters
         self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
-        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs=adv_kwargs, estimation = estimation)
+        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, adv_kwargs=adv_kwargs, estimation = estimation)
         self.lamda = lamda
         self.min_acc = min_acc
         self.dlamda = lamda*0.1
         self.lamda_bound = [lamda*(1/4),lamda*4]
         
     def lamda_schedule(self):
-        acc = self.hist['acc'][-1]
+        acc = self.hist['acc'][-1].item()
         if acc > self.min_acc:
             self.lamda = max(self.lamda + self.dlamda, self.lamda_bound[1])
             self.dlamda = self.dlamda*0.99

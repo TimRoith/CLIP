@@ -42,6 +42,7 @@ class adversarial_update:
                in_norm = None,
                out_norm = None):
         
+        self.model = model
         self.lip_constant_estimate = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
         self.u = nn.Parameter(u.clone())
         self.v = nn.Parameter(v.clone())

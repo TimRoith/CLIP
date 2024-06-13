@@ -1,4 +1,6 @@
 import torch
+import os
+from .save_model import save
 from .CNN import CNN
 from .FC import FC
 
@@ -7,6 +9,8 @@ def load_CNN(cfg):
     model = CNN(mean = cfg.data.mean, std = cfg.data.std, 
                        ksize1 = 5, ksize2 = 5, stride = 1).to(cfg.device)
     name = getattr(cfg.model, 'file_name', 'cnn.pt')
+    if not os.path.exists(cfg.model.path + name):
+        save(model, cfg)
     model.load_state_dict(torch.load(cfg.model.path + name, map_location=cfg.device))
     model.eval()
     return model
@@ -15,6 +19,8 @@ def load_FC(cfg):
     model = FC(sizes = cfg.model.sizes, act_fun = cfg.model.act_fun, 
                        mean = cfg.data.mean, std = cfg.data.std).to(cfg.device)
     name = getattr(cfg.model, 'file_name', 'fc.pt')
+    if not os.path.exists(cfg.model.path + name):
+        save(model, cfg)
     model.load_state_dict(torch.load(cfg.model.path + name, map_location=cfg.device))
     model.eval()
     return model
