@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from .adversarial_update import adversarial_update, lip_constant_estimate
 
 class Trainer:
     def __init__(
@@ -19,6 +20,7 @@ class Trainer:
         self.val_loader = val_loader
         self.verbosity = verbosity
         self.epochs = epochs
+        self.lamda = None
         
     
         self.loss = nn.CrossEntropyLoss() if loss is None else loss
@@ -47,6 +49,9 @@ class Trainer:
             for k,v in self.hist.items():
                 print(str(k)+': ' + str(v[-1]))
     
+    def lamda_schedule(self,):
+        pass
+    
     def train(self,):
         self.model.train()
         self.opt = self.opt_cls(self.model.parameters(), **self.opt_kwargs)
@@ -54,6 +59,7 @@ class Trainer:
         
         for e in range(self.epochs):
             self.train_step()
+            self.lamda_schedule()
             
     def init_hist(self):
         self.hist= {'acc':[], 'loss':[]}
@@ -86,11 +92,96 @@ class StandardTrainer(Trainer):
         self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
         self.running_loss += loss.item()
         
-    
+
+class AdversarialTrainer(Trainer):
+    def __init__(
+            self,
+            model, 
+            train_loader, val_loader=None,
+            loss = None,
+            opt_kwargs = None,
+            num_iters = 5,
+            **kwargs
+            ):
+        super().__init__(model, train_loader, 
+                         val_loader=val_loader, 
+                         loss=loss,
+                         opt_kwargs=opt_kwargs,
+                         **kwargs)
+        self.num_iters = num_iters
         
+    def update(self, x, y):
+        self.opt.zero_grad() # reset gradients
+        x_adv = x.clone().detach().requires_grad_(True)
+        for _ in range(self.num_iters):
+            logits = self.model(x_adv)
+            c_loss = self.loss(logits, y)
+            c_loss.backward()
+            x_adv = x_adv + self.lr * x_adv.grad.sign()
+            x_adv = torch.clamp(x_adv, min=0, max=1)
+            x_adv = x_adv.detach().requires_grad_(True)
+        logits = self.model(x_adv)
+        loss = self.loss(logits, y)
+        loss.backward()
+        self.opt.step()
+        
+        self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
+        self.running_loss += loss.item()  
 
 
-
+class FLIPTrainer(Trainer):
+    def __init__(
+            self,
+            model, 
+            train_loader, val_loader=None,
+            loss = None,
+            opt_kwargs = None,
+            lamda = 0.1,
+            adv_kwargs = None,
+            num_iters = 5,
+            estimation = "max",
+            min_acc = 0.9,
+            **kwargs
+            ):
+        super().__init__(model, train_loader, 
+                         val_loader=val_loader, 
+                         loss=loss,
+                         opt_kwargs=opt_kwargs,
+                         **kwargs)
+        self.num_iters = num_iters
+        self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
+        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, opt_kwargs=adv_kwargs, estimation = estimation)
+        self.lamda = lamda
+        self.min_acc = min_acc
+        self.dlamda = lamda*0.1
+        self.lamda_bound = [lamda*(1/4),lamda*4]
+        
+    def lamda_schedule(self):
+        acc = self.hist['acc'][-1]
+        if acc > self.min_acc:
+            self.lamda = max(self.lamda + self.dlamda, self.lamda_bound[1])
+            self.dlamda = self.dlamda*0.99
+        else:
+            self.lamda = min(self.lamda - self.dlamda, self.lamda_bound[0])
+            self.dlamda = self.dlamda*0.99
+        
+        
+    def update(self, x, y):
+        self.opt.zero_grad() # reset gradients
+        x_adv = x.clone().detach().requires_grad_(True)
+        adv = self.adversarial(x_adv)
+        for _ in range(self.num_iters):
+            adv.step()
+        u, v = adv.u, adv.v
+        c_reg_loss = self.lipschitz(u, v)
+        logits = self.model(x_adv)
+        loss = self.loss(logits, y)
+        loss = loss + self.lamda * c_reg_loss
+        loss.backward()
+        self.opt.step()
+        
+        self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
+        self.running_loss += loss.item()
 
 
 
