@@ -137,7 +137,7 @@ class FLIPTrainer(Trainer):
             train_loader, val_loader=None,
             loss = None,
             opt_kwargs = None,
-            lamda = 0.1,
+            lamda = 1e-2,
             adv_kwargs = None,
             num_iters = 5,
             estimation = "max",
@@ -154,22 +154,25 @@ class FLIPTrainer(Trainer):
         self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, adv_kwargs=adv_kwargs, estimation = estimation)
         self.lamda = lamda
         self.min_acc = min_acc
-        self.dlamda = lamda*0.1
-        self.lamda_bound = [lamda*(1/4),lamda*4]
+        self.dlamda = lamda*0.4
+        self.lamda_bound = [lamda*(1/1000),lamda*4]
         
     def lamda_schedule(self):
         acc = self.hist['acc'][-1].item()
         if acc > self.min_acc:
             self.lamda = min(self.lamda + self.dlamda, self.lamda_bound[1])
-            self.dlamda = self.dlamda*0.99
+            self.dlamda = self.dlamda*0.999
         else:
             self.lamda = max(self.lamda - self.dlamda, self.lamda_bound[0])
-            self.dlamda = self.dlamda*0.99
+            self.dlamda = self.dlamda*0.999
         
         
     def update(self, x, y):
         self.opt.zero_grad() # reset gradients
         x_adv = x.clone().detach().requires_grad_(True)
+        logits = self.model(x)
+        loss = self.loss(logits, y)
+        #print('loss here :', loss)
         adv = self.adversarial(x_adv)
         for _ in range(self.num_iters):
             adv.step()
@@ -177,6 +180,7 @@ class FLIPTrainer(Trainer):
         c_reg_loss = self.lipschitz(u, v)
         logits = self.model(x_adv)
         loss = self.loss(logits, y)
+        #print('c_reg_loss:', c_reg_loss.item())
         loss = loss + self.lamda * c_reg_loss
         loss.backward()
         self.opt.step()

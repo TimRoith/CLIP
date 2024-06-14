@@ -67,8 +67,10 @@ class adversarial_update:
     def step(self,):
         self.opt.zero_grad()
         
-        loss = self.lip_constant_estimate(self.u, self.v)
-        loss_sum = -torch.sum(loss)
+        loss_ = self.lip_constant_estimate(self.u, self.v)
+        loss_sum = -torch.sum(loss_)
         loss_sum.backward()
+        loss_ = -loss_
+        loss_.backward()
         
         self.opt.step()

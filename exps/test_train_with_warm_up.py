@@ -12,30 +12,33 @@ CFG = cfg(data=dataset(),
               name = 'FC', 
               sizes=[784, 200, 80, 10],
               act_fun = 'ReLU',
-              file_name = 'model_warmup_clip.pth', #'model_sum_clip.pth'
+              file_name = 'model_warmup_clip.pth',
               )
           )
 
 model = load_model.load(CFG)
 dataloader= load_MNIST(CFG)
-trainer = StandardTrainer(model, dataloader, 
-                          opt_kwargs={'type': torch.optim.Adam},
-                          verbosity=1,
-                          epochs=1,)
-trainer.train()
-#%%
-set_acc = 0.9
-while trainer.hist['acc'][-1] < set_acc:
-    trainer.train()
+# trainer = StandardTrainer(model, dataloader, 
+#                           opt_kwargs={'type': torch.optim.Adam},
+#                           verbosity=1,
+#                           epochs=1,)
+# trainer.train()
+# #%%
+# set_acc = 0.9
+# while trainer.hist['acc'][-1] < set_acc:
+#     trainer.train()
 
-print('end of warm up with accuracy: ', trainer.hist['acc'][-1].item())
+# print('end of warm up with accuracy: ', trainer.hist['acc'][-1].item())
 #%%
 
-trainer = FLIPTrainer(model, dataloader, 
-                          opt_kwargs={'type': torch.optim.Adam},
+trainer = FLIPTrainer(model, dataloader,
+                          lamda=0,
+                          estimation='sum',
+                          opt_kwargs={'type': torch.optim.Adam, 'lr' : 0.005 },
                           adv_kwargs={'name' : 'Adam', 'lr' : 0.01},
                           verbosity=1,
-                          epochs=100,)
+                          epochs=100,
+                          min_acc=1.,)
 
 trainer.train()
 
