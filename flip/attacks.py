@@ -39,6 +39,41 @@ def select_proj(proj):
     else:
         raise ValueError('Unkwon projection: ' + str(proj) + ' Please choose from:' + str(proj_dict.keys()))
         
+class fgsm(attack):
+    def __init__(
+            self, 
+            x_range = None,
+            max_iters = 1,
+            epsilon = 0.1,
+            proj = 'linf',
+            tau = None,
+            loss = None,
+            targeted = False
+            ):
+        super().__init__(x_range=x_range, epsilon=epsilon)
+        self.loss = nn.CrossEntropyLoss(reduction='sum') if loss is None else loss
+        self.sgn = -1 + 2 * targeted
+        self.tau = tau if tau is not None else epsilon/max_iters
+        self.max_iters = max_iters
+        
+        if isinstance(proj, str):
+            self.project = select_proj(proj)
+        else:
+            self.project = proj
+        
+        
+    def __call__(self, model, x, y):
+        self.init_delta(x)
+        for it in range(self.max_iters):
+            self.delta.grad = None
+            inp = torch.clamp(x + self.delta, *self.x_range)
+            pred = model(inp)
+            loss = self.sgn * self.loss(pred, y)
+            grad = torch.autograd.grad(loss, self.delta)[0]
+            self.delta.data += self.tau*grad.sign()
+            self.project(self.delta, self.epsilon)
+            self.ensure_range(x)
+
 class pgd(attack):
     def __init__(
             self, 
@@ -80,7 +115,8 @@ class pgd(attack):
             inp = torch.clamp(x + self.delta, *self.x_range)
             pred = model(inp)
             loss = self.sgn * self.loss(pred, y)
-            loss.backward()
+            grad = torch.autograd.grad(loss, self.delta)[0]
+            self.delta.data += grad.sign()
             self.opt.step()
             self.project(self.delta, self.epsilon)
             self.ensure_range(x)

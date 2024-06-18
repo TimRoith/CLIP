@@ -69,8 +69,12 @@ class adversarial_update:
         
         loss_ = self.lip_constant_estimate(self.u, self.v)
         loss_sum = -torch.sum(loss_)
-        loss_sum.backward()
-        loss_ = -loss_
-        loss_.backward()
+        gradu, gradv = torch.autograd.grad(loss_sum, [self.u, self.v])
+        self.u.grad = gradu
+        self.v.grad = gradv
+
+        # loss_sum.backward()
+        # loss_ = -loss_
+        # loss_.backward()
         
         self.opt.step()

@@ -21,6 +21,7 @@ class FC(nn.Module):
             layer_list.append(self.act_fn())
             
         layer_list.append(nn.Linear(sizes[-2], sizes[-1]))
+        layer_list.append(nn.Softmax(dim=1))
             
         self.layers = nn.Sequential(*layer_list)
         

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from .adversarial_update import adversarial_update, lip_constant_estimate
+from .attacks import attack, fgsm, pgd
 
 class Trainer:
     def __init__(
@@ -101,6 +102,7 @@ class AdversarialTrainer(Trainer):
             train_loader, val_loader=None,
             loss = None,
             opt_kwargs = None,
+            adv_kwargs = None,
             num_iters = 5,
             **kwargs
             ):
@@ -110,18 +112,15 @@ class AdversarialTrainer(Trainer):
                          opt_kwargs=opt_kwargs,
                          **kwargs)
         self.num_iters = num_iters
-        
+        self.adv_kwargs = adv_kwargs if adv_kwargs is not None else {'epsilon':0.05}
+        attack_cls = self.adv_kwargs.get('type', fgsm)
+        self.adv_kwargs = {k:v for k,v in self.adv_kwargs.items() if not k=='type'}
+        self.attack = attack_cls(**self.adv_kwargs)
+
     def update(self, x, y):
         self.opt.zero_grad() # reset gradients
-        x_adv = x.clone().detach().requires_grad_(True)
-        for _ in range(self.num_iters):
-            logits = self.model(x_adv)
-            c_loss = self.loss(logits, y)
-            c_loss.backward()
-            x_adv = x_adv + self.lr * x_adv.grad.sign()
-            x_adv = torch.clamp(x_adv, min=0, max=1)
-            x_adv = x_adv.detach().requires_grad_(True)
-        logits = self.model(x_adv)
+        self.attack(self.model, x, y)
+        logits = self.model(x+self.attack.delta.detach())
         loss = self.loss(logits, y)
         loss.backward()
         self.opt.step()
@@ -172,16 +171,12 @@ class FLIPTrainer(Trainer):
         x_adv = x.clone().detach().requires_grad_(True)
         logits = self.model(x)
         loss = self.loss(logits, y)
-        #print('loss here :', loss)
         adv = self.adversarial(x_adv)
         for _ in range(self.num_iters):
             adv.step()
         u, v = adv.u, adv.v
         c_reg_loss = self.lipschitz(u, v)
-        logits = self.model(x_adv)
-        loss = self.loss(logits, y)
-        #print('c_reg_loss:', c_reg_loss.item())
-        loss = loss + self.lamda * c_reg_loss
+        #loss = loss + self.lamda * c_reg_loss
         loss.backward()
         self.opt.step()
         

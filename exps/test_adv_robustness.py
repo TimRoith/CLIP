@@ -2,6 +2,7 @@ import torch
 from flip.models import load_model
 from flip.attacks import pgd
 from flip.load_data import load_MNIST_test
+from flip.train import StandardTrainer, FLIPTrainer, AdversarialTrainer
 from flip.utils.config import cfg, dataset, model_attributes
 import matplotlib.pyplot as plt
 
@@ -13,13 +14,21 @@ CFG = cfg(data=dataset(),
               name = 'FC', 
               sizes=[784, 200, 80, 10],
               act_fun = 'ReLU',
-              file_name = 'model_adv_training.pth', #'model_sum_clip.pth'
+              file_name = 'model_adv_training_2.pth', #'model_sum_clip.pth'
               )
           )
 
 model = load_model.load(CFG)
 dataloader= load_MNIST_test(CFG)
-attack = pgd(proj='linf', max_iters=1000, epsilon=1.)
+#%%
+Trainer = AdversarialTrainer(model, dataloader,
+                          opt_kwargs={'type': torch.optim.Adam },
+                          verbosity=1,
+                          epochs=50,)
+
+Trainer.train()
+#%%
+attack = pgd(proj='linf', max_iters=1000, epsilon=0.8)
 
 #%%
 def eval_acc(model, x, y):
