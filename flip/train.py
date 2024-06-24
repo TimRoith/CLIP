@@ -13,9 +13,12 @@ class Trainer:
             opt_kwargs = None,
             verbosity = 0,
             epochs = 100,
+            device = 'cpu',
+            val_attack = "pgd",
             ):
         
         self.model = model
+        self.device = device
         self.train_loader = train_loader
         self.num_data = len(train_loader.dataset)
         self.val_loader = val_loader
@@ -23,6 +26,13 @@ class Trainer:
         self.epochs = epochs
         self.lamda = None
         self.hist= {'acc':[], 'loss':[]}
+        val_attack_type = val_attack
+        if val_attack_type == "fgsm":
+            self.val_attack = fgsm
+        elif val_attack_type == "pgd":
+            self.val_attack = pgd
+        else:
+            raise ValueError('Unknown attack type')
         
     
         self.loss = nn.CrossEntropyLoss() if loss is None else loss
@@ -44,7 +54,41 @@ class Trainer:
         self.hist['acc'].append(self.running_acc/self.num_data)
         
         self.print_step()
+
+    def validation_step(self, verbosity = 1):
+        validation_loader = self.val_loader
+        if self.val_loader is None:
+            print('No validation data provided')
+            return
+        val_acc = 0.0
+        val_loss = 0.0
+        tot_steps = 0
         
+        # -------------------------------------------------------------------------
+        # loop over all batches
+        for batch_idx, (x, y) in enumerate(validation_loader):
+            # get batch data
+            x, y = x.to(self.device), y.to(self.device)
+
+            # update x to a adverserial example
+            x = self.val_attack(self.model, x, y)
+            
+            # evaluate model on batch
+            logits = self.model(x)
+            
+            # Get classification loss
+            c_loss = self.loss(logits, y)
+            
+            val_acc += (logits.max(1)[1] == y).sum().item()
+            val_loss += c_loss.item()
+            tot_steps += y.shape[0]
+            
+        # print accuracy
+        if verbosity > 0: 
+            print(50*"-")
+            print('Validation Accuracy:', val_acc/tot_steps)
+        return {'val_loss':val_loss, 'val_acc':val_acc/tot_steps}
+            
     
     def print_step(self,):
         if self.verbosity > 0:
@@ -113,7 +157,13 @@ class AdversarialTrainer(Trainer):
                          **kwargs)
         self.num_iters = num_iters
         self.adv_kwargs = adv_kwargs if adv_kwargs is not None else {'epsilon':0.05}
-        attack_cls = self.adv_kwargs.get('type', fgsm)
+        attack_cls_type = self.adv_kwargs.get('type', "fgsm")
+        if attack_cls_type == "fgsm":
+            attack_cls = fgsm
+        elif attack_cls_type == "pgd":
+            attack_cls = pgd
+        else:
+            raise ValueError('Unknown attack type')
         self.adv_kwargs = {k:v for k,v in self.adv_kwargs.items() if not k=='type'}
         self.attack = attack_cls(**self.adv_kwargs)
 
