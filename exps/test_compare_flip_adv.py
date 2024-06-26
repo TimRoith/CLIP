@@ -4,6 +4,7 @@ from flip.attacks import pgd
 from flip.train import StandardTrainer, FLIPTrainer, AdversarialTrainer
 from flip.load_data import load_MNIST_test, load_MNIST
 from flip.utils.config import cfg, dataset, model_attributes
+from flip.test import attack_model, eval_acc
 import matplotlib.pyplot as plt
 import time 
 
@@ -20,12 +21,6 @@ CFG = cfg(data=dataset(),
 #%%
 
 dataloader= load_MNIST(CFG)
-
-def eval_acc(model, x, y):
-    return torch.sum(model(x).topk(1)[1][:,0]==y)
-
-
-attack = pgd(proj='linf', max_iters=500, epsilon=0.8)
 epochs = 10
 
 #%%
@@ -39,11 +34,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_ADV = time.time() - start_time
 
-x,y = next(iter(dataloader))
-attack(model_ADV, x, y)
-delta = attack.delta
-eval_acc(model_ADV, x+delta, y)
-acc_ADV = eval_acc(model_ADV, x+delta, y)/len(y)
+acc_ADV = attack_model(model_ADV, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
 
 hist_ADV = trainer.hist.copy()
 
@@ -64,10 +55,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_MAX = time.time() - start_time
 
-x,y = next(iter(dataloader))
-attack(model_MAX, x, y)
-delta = attack.delta
-acc_MAX = eval_acc(model_MAX, x+delta, y)/len(y)
+acc_MAX = attack_model(model_MAX, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
 
 hist_MAX = trainer.hist.copy()
 
@@ -88,10 +76,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_SUM = time.time() - start_time
 
-x,y = next(iter(dataloader))
-attack(model_SUM, x, y)
-delta = attack.delta
-acc_SUM = eval_acc(model_SUM, x+delta, y)/len(y)
+acc_SUM = attack_model(model_SUM, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
 
 hist_SUM = trainer.hist.copy()
 
@@ -108,10 +93,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_STA = time.time() - start_time
 
-x,y = next(iter(dataloader))
-attack(model_STA, x, y)
-delta = attack.delta
-acc_STA = eval_acc(model_STA, x+delta, y)/len(y)
+acc_STA = attack_model(model_STA, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
 
 hist_STA = trainer.hist.copy()
 
