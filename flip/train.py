@@ -55,7 +55,7 @@ class Trainer:
         
         self.print_step()
 
-    def validation_step(self, verbosity = 1):
+    def validation_step(self,):
         validation_loader = self.val_loader
         if self.val_loader is None:
             print('No validation data provided')
@@ -82,9 +82,10 @@ class Trainer:
             val_acc += (logits.max(1)[1] == y).sum().item()
             val_loss += c_loss.item()
             tot_steps += y.shape[0]
-            
+        
+        self.hist['val_loss'].append(val_loss/tot_steps)
         # print accuracy
-        if verbosity > 0: 
+        if self.verbosity > 0: 
             print(50*"-")
             print('Validation Accuracy:', val_acc/tot_steps)
         return {'val_loss':val_loss, 'val_acc':val_acc/tot_steps}
@@ -93,7 +94,8 @@ class Trainer:
     def print_step(self,):
         if self.verbosity > 0:
             for k,v in self.hist.items():
-                print(str(k)+': ' + str(v[-1]))
+                if len(v)>0:
+                    print(str(k)+': ' + str(v[-1]))
     
     def lamda_schedule(self,):
         pass
@@ -106,9 +108,10 @@ class Trainer:
         for e in range(self.epochs):
             self.train_step()
             self.lamda_schedule()
+            val_res = self.validation_step()
             
     def init_hist(self):
-        self.hist= {'acc':[], 'loss':[]}
+        self.hist= {'acc':[], 'loss':[], 'val_acc':[]}
         
             
             

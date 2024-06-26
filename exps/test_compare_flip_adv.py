@@ -30,11 +30,12 @@ trainer = AdversarialTrainer(model_ADV, dataloader,
                           verbosity=1,
                           epochs=epochs,)
 
+print('Begin Adversarial Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_ADV = time.time() - start_time
 
-acc_ADV = attack_model(model_ADV, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
+acc_ADV = attack_model(model_ADV, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':1.}, attack_iter = 20)
 
 hist_ADV = trainer.hist.copy()
 
@@ -51,11 +52,12 @@ trainer = FLIPTrainer(model_MAX, dataloader,
                           epochs=epochs,
                           min_acc=1.,)
 
+print('Begin FLIP - MAX Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_MAX = time.time() - start_time
 
-acc_MAX = attack_model(model_MAX, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
+acc_MAX = attack_model(model_MAX, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':1.}, attack_iter = 20)
 
 hist_MAX = trainer.hist.copy()
 
@@ -72,11 +74,12 @@ trainer = FLIPTrainer(model_SUM, dataloader,
                           epochs=epochs,
                           min_acc=1.,)
 
+print('Begin FLIP - SUM Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_SUM = time.time() - start_time
 
-acc_SUM = attack_model(model_SUM, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
+acc_SUM = attack_model(model_SUM, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':1.}, attack_iter = 20)
 
 hist_SUM = trainer.hist.copy()
 
@@ -89,11 +92,12 @@ trainer = StandardTrainer(model_STA, dataloader,
                           verbosity=1,
                           epochs=epochs,)
 
+print('Begin Standard Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_STA = time.time() - start_time
 
-acc_STA = attack_model(model_STA, dataloader, attack_kwargs = {'type':"pgd"}, attack_iter = 20)
+acc_STA = attack_model(model_STA, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':1.}, attack_iter = 20)
 
 hist_STA = trainer.hist.copy()
 
@@ -106,6 +110,10 @@ plt.plot(hist_ADV['acc'], label='ADV')
 plt.plot(hist_SUM['acc'], label='SUM')
 plt.plot(hist_MAX['acc'], label='MAX')
 plt.plot(hist_STA['acc'], label='STA')
+plt.plot(hist_ADV['val_acc'], label='Validation ADV')
+plt.plot(hist_SUM['val_acc'], label='Validation SUM')
+plt.plot(hist_MAX['val_acc'], label='Validation MAX')
+plt.plot(hist_STA['val_acc'], label='Validation STA')
 plt.xlabel('Epoch')
 plt.ylabel('acc')
 plt.legend()
