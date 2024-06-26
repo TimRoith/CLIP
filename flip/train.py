@@ -14,7 +14,7 @@ class Trainer:
             verbosity = 0,
             epochs = 100,
             device = 'cpu',
-            val_attack = "pgd",
+            val_kwargs = None,
             ):
         
         self.model = model
@@ -26,11 +26,13 @@ class Trainer:
         self.epochs = epochs
         self.lamda = None
         self.hist= {'acc':[], 'loss':[]}
-        val_attack_type = val_attack
+        self.val_kwargs = {'type':'fgsm', 'epsilon':0.8} if val_kwargs is None else val_kwargs
+        val_attack_type = self.val_kwargs.get('type', "fgsm")
+        self.val_kwargs = {k:v for k,v in self.val_kwargs.items() if not k=='type'}
         if val_attack_type == "fgsm":
-            self.val_attack = fgsm
+            self.val_attack = fgsm(**self.val_kwargs)
         elif val_attack_type == "pgd":
-            self.val_attack = pgd
+            self.val_attack = pgd(**self.val_kwargs)
         else:
             raise ValueError('Unknown attack type')
         
@@ -55,11 +57,8 @@ class Trainer:
         
         self.print_step()
 
-    def validation_step(self,):
+    def validation_step(self, verbosity=0):
         validation_loader = self.val_loader
-        if self.val_loader is None:
-            print('No validation data provided')
-            return
         val_acc = 0.0
         val_loss = 0.0
         tot_steps = 0
@@ -69,12 +68,10 @@ class Trainer:
         for batch_idx, (x, y) in enumerate(validation_loader):
             # get batch data
             x, y = x.to(self.device), y.to(self.device)
-
-            # update x to a adverserial example
-            x = self.val_attack(self.model, x, y)
+            self.val_attack(self.model, x, y)
             
             # evaluate model on batch
-            logits = self.model(x)
+            logits = self.model(x+self.val_attack.delta.detach())
             
             # Get classification loss
             c_loss = self.loss(logits, y)
@@ -83,9 +80,9 @@ class Trainer:
             val_loss += c_loss.item()
             tot_steps += y.shape[0]
         
-        self.hist['val_loss'].append(val_loss/tot_steps)
+        self.hist['val_acc'].append(val_acc/tot_steps)
         # print accuracy
-        if self.verbosity > 0: 
+        if verbosity > 0: 
             print(50*"-")
             print('Validation Accuracy:', val_acc/tot_steps)
         return {'val_loss':val_loss, 'val_acc':val_acc/tot_steps}
@@ -104,11 +101,15 @@ class Trainer:
         self.model.train()
         self.opt = self.opt_cls(self.model.parameters(), **self.opt_kwargs)
         self.init_hist()
-        
+        val_ = True
+        if self.val_loader is None:
+            print('No validation data provided - Process training without validation')
+            val_ = False
         for e in range(self.epochs):
             self.train_step()
             self.lamda_schedule()
-            val_res = self.validation_step()
+            if val_:
+                self.validation_step()
             
     def init_hist(self):
         self.hist= {'acc':[], 'loss':[], 'val_acc':[]}

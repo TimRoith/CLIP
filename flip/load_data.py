@@ -100,8 +100,24 @@ def load_ImageNet_test(cfg):
     return val_loader
 
 #%% Define DataLoaders and split in train, valid, test       
-def split_loader(train, test, valid=None, batch_size=128, batch_size_test=100,\
+def split_loader(cfg, valid=None, batch_size=128, batch_size_test=100,\
                  train_split=0.9, num_workers=0, seed=42):
+    cfgd = cfg.data
+    if cfgd.name == "MNIST":
+        train = torchvision.datasets.MNIST(cfgd.path, train=True, download=cfgd.download, transform=transforms.ToTensor())
+        test = torchvision.datasets.MNIST(cfgd.path, train=False, download=cfgd.download, transform=transforms.ToTensor())
+    elif cfgd.name == 'ImageNet':
+        transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            #normalize,
+            #resize_to_range()
+        ])
+        train = torchvision.datasets.ImageNet(cfgd.path + '/ImageNet', split='train', transform=transform)
+        test = torchvision.datasets.ImageNet(cfgd.path + '/ImageNet', split='val', transform=transform)
+    else:
+        raise ValueError("Unknown dataset: " + cfgd.name + '. You can chose from: ' + str(known_datasets))
     total_count = len(train)
     train_count = int(train_split * total_count)
     val_count = total_count - train_count

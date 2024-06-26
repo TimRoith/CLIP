@@ -7,6 +7,7 @@ class dataset:
     xrange: tuple = (0.,1.)
     num_workers: int = 0
     path: str = '../../datasets/'
+    name: str = 'MNIST'
     download: bool = False
     batch_size: int = 32
 
