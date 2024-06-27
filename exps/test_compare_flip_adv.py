@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 import time 
 
 #%%
+time_v = time.time()
+
 CFG = cfg(data=dataset(), 
           model = model_attributes(
               name = 'FC', 
               sizes=[784, 200, 80, 10],
               act_fun = 'ReLU',
-              file_name = 'model_compare_adv.pth',
+              file_name = 'model_compare_adv_v' + str(round(time_v)) + '.pth',
               )
           )
 
@@ -43,7 +45,7 @@ acc_ADV = attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'e
 hist_ADV = trainer.hist.copy()
 
 #%%
-CFG.model.file_name = 'model_compare_max.pth'
+CFG.model.file_name = 'model_compare_max_v' + str(round(time_v)) + '.pth'
 model_MAX = load_model.load(CFG)
 trainer = FLIPTrainer(model_MAX, dataloader, val_loader=validation_loader,
                           lamda=0.1,
@@ -66,7 +68,7 @@ acc_MAX = attack_model(model_MAX, dataloader, attack_kwargs = {'type':"fgsm", 'e
 hist_MAX = trainer.hist.copy()
 
 #%%
-CFG.model.file_name = 'model_compare_sum.pth'
+CFG.model.file_name = 'model_compare_sum_v' + str(round(time_v)) + '.pth'
 model_SUM = load_model.load(CFG)
 trainer = FLIPTrainer(model_SUM, dataloader, val_loader=validation_loader,
                           lamda=0.1,
@@ -90,7 +92,7 @@ hist_SUM = trainer.hist.copy()
 
 
 #%%
-CFG.model.file_name = 'model_compare_sta.pth'
+CFG.model.file_name = 'model_compare_sta_v' + str(round(time_v)) + '.pth'
 model_STA = load_model.load(CFG)
 trainer = StandardTrainer(model_STA, dataloader, val_loader=validation_loader,
                           opt_kwargs={'type': torch.optim.Adam },
