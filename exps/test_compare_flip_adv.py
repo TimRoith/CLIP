@@ -31,16 +31,16 @@ epochs = 10
 model_ADV = load_model.load(CFG)
 trainer = AdversarialTrainer(model_ADV, dataloader, val_loader=validation_loader,
                           opt_kwargs={'type': torch.optim.Adam },
-                          adv_kwargs = {'type' : "fgsm", 'epsilon' : 0.1},
+                          adv_kwargs = {'type' : "fgsm", 'epsilon' : 0.05},
                           verbosity=1,
                           epochs=epochs,)
-print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.}))
+print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
 print('Begin Adversarial Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_ADV = time.time() - start_time
 
-acc_ADV = attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.})
+acc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
 
 hist_ADV = trainer.hist.copy()
 
@@ -48,22 +48,22 @@ hist_ADV = trainer.hist.copy()
 CFG.model.file_name = 'model_compare_max_v' + str(round(time_v)) + '.pth'
 model_MAX = load_model.load(CFG)
 trainer = FLIPTrainer(model_MAX, dataloader, val_loader=validation_loader,
-                          lamda=0.1,
+                          lamda=0.7,
                           num_iters=2,
                           estimation='max',
                           opt_kwargs={'type': torch.optim.Adam },
-                          adv_kwargs={'name' : 'SGD', 'lr' : 0.07},
+                          upd_kwargs={'name' : 'SGD', 'lr' : 0.07},
                           verbosity=1,
                           epochs=epochs,
                           min_acc=1.,)
 
-print('init adv acc for MAX: ', attack_model(model_MAX, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.}))
+print('init adv acc for MAX: ', attack_model(model_MAX, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
 print('Begin FLIP - MAX Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_MAX = time.time() - start_time
 
-acc_MAX = attack_model(model_MAX, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.})
+acc_MAX = attack_model(model_MAX, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
 
 hist_MAX = trainer.hist.copy()
 
@@ -71,22 +71,22 @@ hist_MAX = trainer.hist.copy()
 CFG.model.file_name = 'model_compare_sum_v' + str(round(time_v)) + '.pth'
 model_SUM = load_model.load(CFG)
 trainer = FLIPTrainer(model_SUM, dataloader, val_loader=validation_loader,
-                          lamda=0.1,
+                          lamda=0.7,
                           num_iters=2,
                           estimation='sum',
                           opt_kwargs={'type': torch.optim.Adam },
-                          adv_kwargs={'name' : 'SGD', 'lr' : 0.07},
+                          upd_kwargs={'name' : 'SGD', 'lr' : 0.07},
                           verbosity=1,
                           epochs=epochs,
                           min_acc=1.,)
 
-print('init adv acc for SUM: ', attack_model(model_SUM, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.}))
+print('init adv acc for SUM: ', attack_model(model_SUM, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
 print('Begin FLIP - SUM Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_SUM = time.time() - start_time
 
-acc_SUM = attack_model(model_SUM, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.})
+acc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
 
 hist_SUM = trainer.hist.copy()
 
@@ -99,13 +99,13 @@ trainer = StandardTrainer(model_STA, dataloader, val_loader=validation_loader,
                           verbosity=1,
                           epochs=epochs,)
 
-print('init adv acc for STA: ', attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.}))
+print('init adv acc for STA: ', attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
 print('Begin Standard Training')
 start_time = time.time()
 trainer.train()
 elapsed_time_STA = time.time() - start_time
 
-acc_STA = attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1.})
+acc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
 
 hist_STA = trainer.hist.copy()
 

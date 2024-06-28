@@ -191,7 +191,7 @@ class FLIPTrainer(Trainer):
             loss = None,
             opt_kwargs = None,
             lamda = 1e-2,
-            adv_kwargs = None,
+            upd_kwargs = None,
             num_iters = 5,
             estimation = "max",
             min_acc = 0.9,
@@ -204,7 +204,7 @@ class FLIPTrainer(Trainer):
                          **kwargs)
         self.num_iters = num_iters
         self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
-        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, adv_kwargs=adv_kwargs, estimation = estimation)
+        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, adv_kwargs=upd_kwargs, estimation = estimation)
         self.lamda = lamda
         self.min_acc = min_acc
         self.dlamda = lamda*0.4
@@ -230,14 +230,68 @@ class FLIPTrainer(Trainer):
             adv.step()
         u, v = adv.u, adv.v
         c_reg_loss = self.lipschitz(u, v)
-        #loss = loss + self.lamda * c_reg_loss
+        loss = loss + self.lamda * c_reg_loss
         loss.backward()
         self.opt.step()
         
         self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
         self.running_loss += loss.item()
 
+class AdvFlipTrainer(Trainer):
+    def __init__(
+            self,
+            model, 
+            train_loader, val_loader=None,
+            loss = None,
+            opt_kwargs = None,
+            lamda = 1e-2,
+            adv_kwargs = None,
+            upd_kwargs = None,
+            num_iters = 5,
+            estimation = "max",
+            min_acc = 0.9,
+            **kwargs
+            ):
+        super().__init__(model, train_loader, 
+                         val_loader=val_loader, 
+                         loss=loss,
+                         opt_kwargs=opt_kwargs,
+                         **kwargs)
+        self.num_iters = num_iters
+        self.adv_kwargs = adv_kwargs if adv_kwargs is not None else {'epsilon':0.05}
+        attack_cls_type = self.adv_kwargs.get('type', "fgsm")
+        if attack_cls_type == "fgsm":
+            attack_cls = fgsm
+        elif attack_cls_type == "pgd":
+            attack_cls = pgd
+        else:
+            raise ValueError('Unknown attack type')
+        self.adv_kwargs = {k:v for k,v in self.adv_kwargs.items() if not k=='type'}
+        self.attack = attack_cls(**self.adv_kwargs)
+        self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
+        self.adversarial = lambda u: adversarial_update(self.model, u, u+torch.rand_like(u)*0.1, adv_kwargs=upd_kwargs, estimation = estimation)
+        self.lamda = lamda
+        self.min_acc = min_acc
+        self.dlamda = lamda*0.4
+        self.lamda_bound = [lamda*(1/1000),lamda*4]
 
+    def update(self, x, y):
+        self.opt.zero_grad() # reset gradients
+        self.attack(self.model, x, y)
+        logits = self.model(x+self.attack.delta.detach())
+        loss = self.loss(logits, y)
+        x_adv = x.clone().detach().requires_grad_(True)
+        adv = self.adversarial(x_adv)
+        for _ in range(self.num_iters):
+            adv.step()
+        u, v = adv.u, adv.v
+        c_reg_loss = self.lipschitz(u, v)
+        loss = loss + self.lamda * c_reg_loss
+        loss.backward()
+        self.opt.step()
+        
+        self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
+        self.running_loss += loss.item()  
 
 
 # class Trainer:
