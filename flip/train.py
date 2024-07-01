@@ -94,7 +94,7 @@ class Trainer:
                 if len(v)>0:
                     print(str(k)+': ' + str(v[-1]))
     
-    def lamda_schedule(self,):
+    def schedule(self,):
         pass
     
     def train(self,):
@@ -107,7 +107,7 @@ class Trainer:
             val_ = False
         for e in range(self.epochs):
             self.train_step()
-            self.lamda_schedule()
+            self.schedule()
             if val_:
                 self.validation_step()
             
@@ -210,7 +210,7 @@ class FLIPTrainer(Trainer):
         self.dlamda = lamda*0.4
         self.lamda_bound = [lamda*(1/1000),lamda*4]
         
-    def lamda_schedule(self):
+    def schedule(self):
         acc = self.hist['acc'][-1].item()
         if acc > self.min_acc:
             self.lamda = min(self.lamda + self.dlamda, self.lamda_bound[1])
@@ -292,6 +292,64 @@ class AdvFlipTrainer(Trainer):
         
         self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
         self.running_loss += loss.item()  
+
+class TVTrainer(Trainer):
+    def __init__(
+            self,
+            model, 
+            train_loader, val_loader=None,
+            loss = None,
+            opt_kwargs = None,
+            lamda = 1e-2,
+            upd_kwargs = None,
+            num_iters = 5,
+            approximation = 1e-1,
+            approximation_decrep = 0.9,
+            min_acc = 0.9,
+            **kwargs
+            ):
+        super().__init__(model, train_loader, 
+                         val_loader=val_loader, 
+                         loss=loss,
+                         opt_kwargs=opt_kwargs,
+                         **kwargs)
+        self.num_iters = num_iters
+        self.approximation = approximation
+        self.approx_decrep = approximation_decrep
+        self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = "sum")(u, v)
+        self.adversarial = lambda u, approx: adversarial_update(self.model, u, u+torch.rand_like(u)*approx, adv_kwargs=upd_kwargs, estimation = "sum")
+        self.lamda = lamda
+        self.min_acc = min_acc
+        self.dlamda = lamda*0.4
+        self.lamda_bound = [lamda*(1/1000),lamda*4]
+        
+    def schedule(self):
+        acc = self.hist['acc'][-1].item()
+        if acc > self.min_acc:
+            self.lamda = min(self.lamda + self.dlamda, self.lamda_bound[1])
+            self.dlamda = self.dlamda*0.999
+        else:
+            self.lamda = max(self.lamda - self.dlamda, self.lamda_bound[0])
+            self.dlamda = self.dlamda*0.999
+        self.approximation = max(self.approximation*self.approx_decrep, 1e-9)
+        print('Approximation:', self.approximation)
+    
+    def update(self, x, y):
+        self.opt.zero_grad() # reset gradients
+        x_adv = x.clone().detach().requires_grad_(True)
+        logits = self.model(x)
+        loss = self.loss(logits, y)
+        adv = self.adversarial(x_adv, self.approximation)
+        for _ in range(self.num_iters):
+            adv.step()
+        u, v = adv.u, adv.v
+        c_reg_loss = self.lipschitz(u, v)
+        loss = loss + self.lamda * c_reg_loss
+        loss.backward()
+        self.opt.step()
+        
+        self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
+        self.running_loss += loss.item()
 
 
 # class Trainer:

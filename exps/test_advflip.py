@@ -18,25 +18,43 @@ model = load_model.load(CFG)
 
 accuracy = attack_model(model, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': 0.1})
 
-print('advflip :', accuracy)
+print('advflip : ', accuracy)
 
 CFG.model.file_name = 'model_lipschitz_adv_v1719581713.pth'
 model_adv = load_model.load(CFG)
 
 accuracy = attack_model(model_adv, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': 0.1})
 
-print('adv :', accuracy)
+print('adv : ', accuracy)
 
 CFG.model.file_name = 'model_compare_sum_v1719580187.pth'
 model_sum = load_model.load(CFG)
 
 accuracy = attack_model(model_sum, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': 0.1})
 
-print('sum', accuracy)
+print('sum :', accuracy)
+
+accuracy = attack_model(model_sum, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.05})
+
+print('sum vs fgsm : ', accuracy)
 
 CFG.model.file_name = 'model_compare_max_v1719581300.pth'
 model_max = load_model.load(CFG)
 
 accuracy = attack_model(model_max, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': 0.1})
 
-print('max', accuracy)
+print('max : ', accuracy)
+
+CFG.model.file_name = 'model_lipschitz_adv_v1719828279.pth'
+model_adv = load_model.load(CFG)
+
+accuracy = attack_model(model_adv, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.05})
+
+print('adv_pgd vs fgsm : ', accuracy)
+
+CFG.model.file_name = 'model_lipschitz_adv_v1719828279.pth'
+model_adv = load_model.load(CFG)
+
+accuracy = attack_model(model_adv, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': 0.1})
+
+print('adv_pgd : ', accuracy)
