@@ -78,3 +78,48 @@ class adversarial_update:
         # loss_.backward()
         
         self.opt.step()
+
+class projected_adversarial_update :
+    def __init__(self, 
+               model,
+               u, v, 
+               adv_kwargs,
+               estimation,
+               ray_kwargs,
+               in_norm = None,
+               out_norm = None):
+        
+        self.model = model
+        self.lip_constant_estimate = lambda u, v: lip_constant_estimate(self.model, estimation = estimation)(u, v)
+        self.u = nn.Parameter(u.clone())
+        self.v = nn.Parameter(v.clone())
+        self.x = nn.Parameter(ray_kwargs.get('x', u.clone()))
+        self.ray = ray_kwargs.get('ray', 0.1)
+        
+        opt_name = adv_kwargs.get('name', 'SGD')
+        if opt_name == 'SGD':
+            self.opt = SGD([self.u, self.v], 
+                           lr=adv_kwargs.get('lr', 0.1), 
+                           momentum=adv_kwargs.get('lr', 0.9))
+        elif opt_name == 'Adam':
+            self.opt = Adam([self.u, self.v], 
+                           lr=adv_kwargs.get('lr', 0.001),)
+        elif opt_name == 'Nesterov':
+            self.opt = SGD([self.u, self.v], 
+                           lr=adv_kwargs.get('lr', 0.1), 
+                           momentum=adv_kwargs.get('lr', 0.9),
+                           nesterov=True)
+        else:
+            raise ValueError('Unknown optimizer: ' + str(adv_kwargs['name']))
+        
+    def step(self,):
+        self.opt.zero_grad()
+        loss_ = self.lip_constant_estimate(self.u, self.v)
+        loss_sum = -torch.sum(loss_)
+        gradu, gradv = torch.autograd.grad(loss_sum, [self.u, self.v])
+        self.u.grad = gradu
+        self.v.grad = gradv
+        self.opt.step()
+        
+        self.u.data = self.x + self.ray * (self.u - self.x) / torch.norm(self.u - self.x)
+        self.v.data = self.x + self.ray * (self.v - self.x) / torch.norm(self.v - self.x)

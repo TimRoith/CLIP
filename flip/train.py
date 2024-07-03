@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .adversarial_update import adversarial_update, lip_constant_estimate
+from .adversarial_update import adversarial_update, lip_constant_estimate, projected_adversarial_update
 from .attacks import attack, fgsm, pgd
 
 class Trainer:
@@ -303,6 +303,7 @@ class TVTrainer(Trainer):
             lamda = 1e-2,
             upd_kwargs = None,
             num_iters = 5,
+            projection = False,
             approximation = 1e-1,
             approximation_decrep = 0.9,
             min_acc = 0.9,
@@ -317,7 +318,10 @@ class TVTrainer(Trainer):
         self.approximation = approximation
         self.approx_decrep = approximation_decrep
         self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = "sum")(u, v)
-        self.adversarial = lambda u, approx: adversarial_update(self.model, u, u+torch.rand_like(u)*approx, adv_kwargs=upd_kwargs, estimation = "sum")
+        if projection:
+            self.adversarial = lambda u, ray: projected_adversarial_update(self.model, u, u+torch.rand_like(u)*ray, ray_kwargs={'x':u, 'ray':ray}, adv_kwargs=upd_kwargs, estimation = "sum")
+        else :
+            self.adversarial = lambda u, approx: adversarial_update(self.model, u, u+torch.rand_like(u)*approx, adv_kwargs=upd_kwargs, estimation = "sum")
         self.lamda = lamda
         self.min_acc = min_acc
         self.dlamda = lamda*0.4

@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import time 
 
 #%%
+epsilon_test = 0.04
+adversarial_test = "fgsm"
+
 time_v = time.time()
 
 CFG = cfg(data=dataset(), 
@@ -40,7 +43,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_ADV = time.time() - start_time
 
-acc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type': adversarial_test, 'epsilon': epsilon_test})
 
 hist_ADV = trainer.hist.copy()
 
@@ -63,7 +66,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_TV = time.time() - start_time
 
-acc_TV = attack_model(model_TV, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_TV = attack_model(model_TV, test_loader, attack_kwargs = {'type': adversarial_test, 'epsilon': epsilon_test})
 
 hist_TV = trainer.hist.copy()
 
@@ -86,7 +89,7 @@ start_time = time.time()
 trainer.train()
 elapsed_time_SUM = time.time() - start_time
 
-acc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type': adversarial_test, 'epsilon': epsilon_test})
 
 hist_SUM = trainer.hist.copy()
 
@@ -105,9 +108,33 @@ start_time = time.time()
 trainer.train()
 elapsed_time_STA = time.time() - start_time
 
-acc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type': adversarial_test, 'epsilon': epsilon_test})
 
 hist_STA = trainer.hist.copy()
+
+#%%
+CFG.model.file_name = 'model_compare_pTV_v' + str(round(time_v)) + '.pth'
+model_pTV = load_model.load(CFG)
+trainer = TVTrainer(model_pTV, dataloader, val_loader=validation_loader,
+                          lamda=0.7,
+                          num_iters=2,
+                          projection=True,
+                          approximation_decrep=0.3,
+                          opt_kwargs={'type': torch.optim.Adam },
+                          upd_kwargs={'name' : 'SGD', 'lr' : 0.07},
+                          verbosity=1,
+                          epochs=epochs,
+                          min_acc=1.,)
+
+print('init adv acc for pTV: ', attack_model(model_pTV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('Begin FLIP - pTV Training')
+start_time = time.time()
+trainer.train()
+elapsed_time_pTV = time.time() - start_time
+
+acc_pTV = attack_model(model_pTV, test_loader, attack_kwargs = {'type': adversarial_test, 'epsilon': epsilon_test})
+
+hist_pTV = trainer.hist.copy()
 
 #%%
 plt.figure(figsize=(10, 5))
@@ -117,6 +144,7 @@ plt.subplot(1, 3, 1)
 plt.plot(hist_ADV['acc'], label='ADV')
 plt.plot(hist_SUM['acc'], label='SUM')
 plt.plot(hist_TV['acc'], label='TV')
+plt.plot(hist_pTV['acc'], label='pTV')
 plt.plot(hist_STA['acc'], label='STA')
 plt.xlabel('Epoch')
 plt.ylabel('acc')
@@ -127,6 +155,7 @@ plt.subplot(1, 3, 2)
 plt.plot(hist_ADV['loss'], label='ADV')
 plt.plot(hist_SUM['loss'], label='SUM')
 plt.plot(hist_TV['loss'], label='TV')
+plt.plot(hist_pTV['loss'], label='pTV')
 plt.plot(hist_STA['loss'], label='STA')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
@@ -137,6 +166,7 @@ plt.subplot(1, 3, 3)
 plt.plot(hist_ADV['val_acc'], label='Validation ADV')
 plt.plot(hist_SUM['val_acc'], label='Validation SUM')
 plt.plot(hist_TV['val_acc'], label='Validation TV')
+plt.plot(hist_pTV['val_acc'], label='Validation pTV')
 plt.plot(hist_STA['val_acc'], label='Validation STA')
 plt.xlabel('Epoch')
 plt.ylabel('val acc')
@@ -148,9 +178,11 @@ plt.show()
 #%%
 print('time SUM: ', elapsed_time_SUM)
 print('time TV: ', elapsed_time_TV)
+print('time pTV: ', elapsed_time_pTV)
 print('time ADV: ', elapsed_time_ADV)
 print('time STA: ', elapsed_time_STA)
 print('adv acc SUM: ', acc_SUM)
 print('adv acc TV: ', acc_TV)
+print('adv acc pTV: ', acc_pTV)
 print('adv acc ADV: ', acc_ADV)
 print('adv acc STA: ', acc_STA)
