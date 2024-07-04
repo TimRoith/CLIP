@@ -45,7 +45,7 @@ trainer = AdversarialTrainer(model_ADV, dataloader, val_loader=validation_loader
                         adv_kwargs = {'type' : "fgsm", 'epsilon' : 0.05},
                         verbosity=1,
                         epochs=epochs,)
-print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin Adversarial Training')
 start_time = time.time()
 trainer.train()
@@ -67,7 +67,7 @@ trainer = TVTrainer(model_TV, dataloader, val_loader=validation_loader,
                         epochs=epochs,
                         min_acc=1.,)
 
-print('init adv acc for TV: ', attack_model(model_TV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('init adv acc for TV: ', attack_model(model_TV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin FLIP - TV Training')
 start_time = time.time()
 trainer.train()
@@ -89,7 +89,7 @@ trainer = FLIPTrainer(model_SUM, dataloader, val_loader=validation_loader,
                         epochs=epochs,
                         min_acc=1.,)
 
-print('init adv acc for SUM: ', attack_model(model_SUM, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('init adv acc for SUM: ', attack_model(model_SUM, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin FLIP - SUM Training')
 start_time = time.time()
 trainer.train()
@@ -105,7 +105,7 @@ trainer = StandardTrainer(model_STA, dataloader, val_loader=validation_loader,
                         verbosity=1,
                         epochs=epochs,)
 
-print('init adv acc for STA: ', attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('init adv acc for STA: ', attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin Standard Training')
 start_time = time.time()
 trainer.train()
@@ -127,7 +127,7 @@ trainer = TVTrainer(model_pTV, dataloader, val_loader=validation_loader,
                         epochs=epochs,
                         min_acc=1.,)
 
-print('init adv acc for pTV: ', attack_model(model_pTV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iter':1})) # Expected to be near 0
+print('init adv acc for pTV: ', attack_model(model_pTV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin FLIP - pTV Training')
 start_time = time.time()
 trainer.train()

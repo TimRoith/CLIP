@@ -5,8 +5,16 @@ from flip.utils.config import cfg, dataset, model_attributes
 def eval_acc(model, x, y):
     return torch.sum(model(x).topk(1)[1][:,0]==y)
 
-def get_attack(type = pgd, max_iter=100, epsilon=0.8, proj='linf', tau = None, loss = None, targeted = False, x_range = None, opt_kwargs = None):
-    attack = type(proj=proj, max_iters=max_iter, epsilon=epsilon)
+def test_acc(model, dataloader):
+    eval = 0
+    tot_step = 0
+    for x,y in iter(dataloader):
+        eval += eval_acc(model, x, y)
+        tot_step += len(y)
+    return eval/tot_step
+
+def get_attack(type = pgd, max_iters=100, epsilon=0.8, proj='linf', tau = None, loss = None, targeted = False, x_range = None, opt_kwargs = None):
+    attack = type(proj=proj, max_iters=max_iters, epsilon=epsilon)
     return attack
 
 def attack_model(model, dataloader, attack_kwargs = None):

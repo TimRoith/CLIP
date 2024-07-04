@@ -34,7 +34,7 @@ trainer = AdversarialTrainer(model_ADV, dataloader, val_loader=validation_loader
                           adv_kwargs = {'type' : "pgd", 'epsilon' : 0.05},
                           verbosity=1,
                           epochs=epochs,)
-print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':0.3, 'max_iter':1})) # Expected to be near 0
+print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"pgd", 'epsilon':0.3, 'max_iters':1})) # Expected to be near 0
 print('Begin Adversarial Training')
 start_time = time.time()
 trainer.train()
@@ -56,7 +56,7 @@ trainer = FLIPTrainer(model_final, dataloader, val_loader=validation_loader,
                           epochs=1,
                           min_acc=1.,)
 
-print('init adv acc for already adversarial trained model : ', attack_model(model_final, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':0.3, 'max_iter':1})) # Expected to be near 0
+print('init adv acc for already adversarial trained model : ', attack_model(model_final, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':0.3, 'max_iters':1})) # Expected to be near 0
 print('Begin FLIP - Sum new training')
 start_time = time.time()
 trainer.train()
@@ -79,7 +79,7 @@ trainer = AdvFlipTrainer(model, dataloader, val_loader=validation_loader,
                             verbosity=1,
                             epochs=epochs,
                             min_acc=0.9,)
-print('init adv acc for adversarial & lipschitz trained model : ', attack_model(model, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':0.3, 'max_iter':1})) # Expected to be near 0
+print('init adv acc for adversarial & lipschitz trained model : ', attack_model(model, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':0.3, 'max_iters':1})) # Expected to be near 0
 print('Begin FLIP - ADV new training')
 start_time = time.time()
 trainer.train()
