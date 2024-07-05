@@ -106,6 +106,9 @@ class Trainer:
             print('No validation data provided - Process training without validation')
             val_ = False
         for e in range(self.epochs):
+            if self.verbosity > 0:
+                print(50*"-")
+                print('Epoch:', e)
             self.train_step()
             self.schedule()
             if val_:
