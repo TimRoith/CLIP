@@ -1,7 +1,7 @@
 import torch
 from flip.models import load_model
 from flip.attacks import pgd
-from flip.load_data2 import load_MNIST_test, split_loader
+from flip.load_data import load_MNIST_test, split_loader
 from flip.train import StandardTrainer, FLIPTrainer, AdversarialTrainer
 from flip.utils.config import cfg, dataset, model_attributes
 from flip.test import attack_model, eval_acc, test_acc
@@ -10,10 +10,10 @@ import time
 
 time_v = time.time()
 
-CFG = cfg(data=dataset(name='CIFAR10'), 
+CFG = cfg(data=dataset(name='MNIST'), 
           model = model_attributes(
               name = 'FC', 
-              sizes=[3072, 128, 80, 10], # [784, 200, 80, 10]
+              sizes=[784, 200, 80, 10], # [3072, 128, 80, 10]
               act_fun = 'ReLU',
               file_name = 'model_adv_training_v'+ str(round(time_v)) + '.pth',
               )
