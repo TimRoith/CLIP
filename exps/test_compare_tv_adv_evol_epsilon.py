@@ -15,10 +15,10 @@ adversarial_test = "pgd"
 
 time_v = time.time()
 
-CFG = cfg(data=dataset(), 
+CFG = cfg(data=dataset(name='CIFAR10'), 
           model = model_attributes(
               name = 'FC', 
-              sizes=[784, 200, 80, 10],
+              sizes=[3072, 128, 80, 10], # [784, 200, 80, 10]
               act_fun = 'ReLU',
               file_name = 'model_compare_adv_v' + str(round(time_v)) + '.pth',
               )

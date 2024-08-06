@@ -25,7 +25,9 @@ CFG = cfg(data=dataset(),
 # split data
 dataloader, validation_loader, test_loader = split_loader(CFG, train_split=0.8)
 
-epochs = 10
+epochs = 20
+eps_fgsm = 0.1
+eps_pgd = 0.6
 
 #%%
 model_ADV = load_model.load(CFG)
@@ -37,10 +39,11 @@ trainer = AdversarialTrainer(model_ADV, dataloader, val_loader=validation_loader
 print('init adv acc for adversarial: ', attack_model(model_ADV, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin Adversarial Training')
 start_time = time.time()
-trainer.train()
+#trainer.train()
 elapsed_time_ADV = time.time() - start_time
 
-acc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': eps_fgsm})
+pacc_ADV = attack_model(model_ADV, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': eps_pgd})
 
 hist_ADV = trainer.hist.copy()
 
@@ -63,7 +66,8 @@ start_time = time.time()
 trainer.train()
 elapsed_time_MAX = time.time() - start_time
 
-acc_MAX = attack_model(model_MAX, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_MAX = attack_model(model_MAX, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': eps_fgsm})
+pacc_MAX = attack_model(model_MAX, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': eps_pgd})
 
 hist_MAX = trainer.hist.copy()
 
@@ -86,7 +90,8 @@ start_time = time.time()
 trainer.train()
 elapsed_time_SUM = time.time() - start_time
 
-acc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': eps_fgsm})
+pacc_SUM = attack_model(model_SUM, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': eps_pgd})
 
 hist_SUM = trainer.hist.copy()
 
@@ -102,48 +107,49 @@ trainer = StandardTrainer(model_STA, dataloader, val_loader=validation_loader,
 print('init adv acc for STA: ', attack_model(model_STA, dataloader, attack_kwargs = {'type':"fgsm", 'epsilon':1., 'max_iters':1})) # Expected to be near 0
 print('Begin Standard Training')
 start_time = time.time()
-trainer.train()
+#trainer.train()
 elapsed_time_STA = time.time() - start_time
 
-acc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': 0.1})
+acc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type':"fgsm", 'epsilon': eps_fgsm})
+pacc_STA = attack_model(model_STA, test_loader, attack_kwargs = {'type':"pgd", 'epsilon': eps_pgd})
 
 hist_STA = trainer.hist.copy()
 
 #%%
-plt.figure(figsize=(10, 5))
+# plt.figure(figsize=(10, 5))
 
-# Plot acc
-plt.subplot(1, 3, 1)
-plt.plot(hist_ADV['acc'], label='ADV')
-plt.plot(hist_SUM['acc'], label='SUM')
-plt.plot(hist_MAX['acc'], label='MAX')
-plt.plot(hist_STA['acc'], label='STA')
-plt.xlabel('Epoch')
-plt.ylabel('acc')
-plt.legend()
+# # Plot acc
+# plt.subplot(1, 3, 1)
+# plt.plot(hist_ADV['acc'], label='ADV')
+# plt.plot(hist_SUM['acc'], label='SUM')
+# plt.plot(hist_MAX['acc'], label='MAX')
+# plt.plot(hist_STA['acc'], label='STA')
+# plt.xlabel('Epoch')
+# plt.ylabel('acc')
+# plt.legend()
 
-# Plot loss
-plt.subplot(1, 3, 2)
-plt.plot(hist_ADV['loss'], label='ADV')
-plt.plot(hist_SUM['loss'], label='SUM')
-plt.plot(hist_MAX['loss'], label='MAX')
-plt.plot(hist_STA['loss'], label='STA')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.legend()
+# # Plot loss
+# plt.subplot(1, 3, 2)
+# plt.plot(hist_ADV['loss'], label='ADV')
+# plt.plot(hist_SUM['loss'], label='SUM')
+# plt.plot(hist_MAX['loss'], label='MAX')
+# plt.plot(hist_STA['loss'], label='STA')
+# plt.xlabel('Epoch')
+# plt.ylabel('Loss')
+# plt.legend()
 
-# Plot validation acc
-plt.subplot(1, 3, 3)
-plt.plot(hist_ADV['val_acc'], label='Validation ADV')
-plt.plot(hist_SUM['val_acc'], label='Validation SUM')
-plt.plot(hist_MAX['val_acc'], label='Validation MAX')
-plt.plot(hist_STA['val_acc'], label='Validation STA')
-plt.xlabel('Epoch')
-plt.ylabel('val acc')
-plt.legend()
+# # Plot validation acc
+# plt.subplot(1, 3, 3)
+# plt.plot(hist_ADV['val_acc'], label='Validation ADV')
+# plt.plot(hist_SUM['val_acc'], label='Validation SUM')
+# plt.plot(hist_MAX['val_acc'], label='Validation MAX')
+# plt.plot(hist_STA['val_acc'], label='Validation STA')
+# plt.xlabel('Epoch')
+# plt.ylabel('val acc')
+# plt.legend()
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
 
 #%%
 print('time SUM: ', elapsed_time_SUM)
@@ -154,3 +160,7 @@ print('adv acc SUM: ', acc_SUM)
 print('adv acc MAX: ', acc_MAX)
 print('adv acc ADV: ', acc_ADV)
 print('adv acc STA: ', acc_STA)
+print('pgd adv acc SUM: ', pacc_SUM)
+print('pgd adv acc MAX: ', pacc_MAX)
+print('pgd adv acc ADV: ', pacc_ADV)
+print('pgd adv acc STA: ', pacc_STA)

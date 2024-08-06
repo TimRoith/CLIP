@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from .adversarial_update import adversarial_update, lip_constant_estimate, projected_adversarial_update
 from .attacks import attack, fgsm, pgd
+from .models.save_model import save
 
 class Trainer:
     def __init__(
@@ -15,8 +16,9 @@ class Trainer:
             epochs = 100,
             device = 'cpu',
             val_kwargs = None,
+            cfg = None,
             ):
-        
+        self.cfg = cfg
         self.model = model
         self.device = device
         self.train_loader = train_loader
@@ -98,6 +100,8 @@ class Trainer:
         pass
     
     def train(self,):
+        if self.cfg is None:
+            print('No configuration provided - Training without saving')
         self.model.train()
         self.opt = self.opt_cls(self.model.parameters(), **self.opt_kwargs)
         self.init_hist()
@@ -113,6 +117,7 @@ class Trainer:
             self.schedule()
             if val_:
                 self.validation_step()
+        save(self.model, self.cfg)
             
     def init_hist(self):
         self.hist= {'acc':[], 'loss':[], 'val_acc':[]}
