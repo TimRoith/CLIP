@@ -117,7 +117,8 @@ class Trainer:
             self.schedule()
             if val_:
                 self.validation_step()
-        save(self.model, self.cfg)
+        if self.cfg is not None:
+            save(self.model, self.cfg)
             
     def init_hist(self):
         self.hist= {'acc':[], 'loss':[], 'val_acc':[]}
