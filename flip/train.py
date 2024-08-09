@@ -344,7 +344,7 @@ class TVTrainer(Trainer):
         else:
             self.lamda = max(self.lamda - self.dlamda, self.lamda_bound[0])
             self.dlamda = self.dlamda*0.999
-        self.approximation = max(self.approximation*self.approx_decrep, 1e-9)
+        self.approximation = max(self.approximation*self.approx_decrep, 7e-5)
         print('Approximation:', self.approximation)
     
     def update(self, x, y):
