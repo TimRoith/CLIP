@@ -363,6 +363,71 @@ class TVTrainer(Trainer):
         self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
         self.running_loss += loss.item()
 
+class ATVTrainer(Trainer):
+    def __init__(
+            self,
+            model, 
+            train_loader, val_loader=None,
+            loss = None,
+            opt_kwargs = None,
+            lamda = 1e-2,
+            adv_kwargs = None,
+            num_iters = 5,
+            approximation = 1e-1,
+            approximation_decrep = 0.9,
+            min_acc = 0.9,
+            **kwargs
+            ):
+        super().__init__(model, train_loader, 
+                         val_loader=val_loader, 
+                         loss=loss,
+                         opt_kwargs=opt_kwargs,
+                         **kwargs)
+        self.num_iters = num_iters
+        self.approximation = approximation
+        self.approx_decrep = approximation_decrep
+        self.lipschitz = lambda u, v: lip_constant_estimate(self.model, estimation = "sum")(u, v)
+        self.lamda = lamda
+        self.min_acc = min_acc
+        self.dlamda = lamda*0.4
+        self.lamda_bound = [lamda*(1/1000),lamda*4]
+        self.adv_kwargs = adv_kwargs if adv_kwargs is not None else {'epsilon':0.05}
+        attack_cls_type = self.adv_kwargs.get('type', "fgsm")
+        if attack_cls_type == "fgsm":
+            attack_cls = fgsm
+        elif attack_cls_type == "pgd":
+            attack_cls = pgd
+        else:
+            raise ValueError('Unknown attack type')
+        self.adv_kwargs = {k:v for k,v in self.adv_kwargs.items() if not k=='type'}
+        self.attack = attack_cls(**self.adv_kwargs)
+        
+    def schedule(self):
+        acc = self.hist['acc'][-1].item()
+        if acc > self.min_acc:
+            self.lamda = min(self.lamda + self.dlamda, self.lamda_bound[1])
+            self.dlamda = self.dlamda*0.999
+        else:
+            self.lamda = max(self.lamda - self.dlamda, self.lamda_bound[0])
+            self.dlamda = self.dlamda*0.999
+        self.approximation = max(self.approximation*self.approx_decrep, 1e-9)
+        print('Approximation:', self.approximation)
+    
+    def update(self, x, y):
+        self.opt.zero_grad() # reset gradients
+        self.attack(self.model, x, y)
+        delta = self.attack.delta.detach()/torch.norm(self.attack.delta.view(self.attack.delta.shape[0], -1), p=2, dim=1)[:,None,None,None]
+        logits_adv = self.model(x+delta*self.approximation)
+        logits = self.model(x)
+        dist_loss = torch.norm(logits_adv - logits, p=2, dim=1).sum()/self.approximation
+        loss = self.loss(logits, y)
+        loss = loss + self.lamda * dist_loss
+        loss.backward()
+        self.opt.step()
+        
+        self.running_acc += torch.sum(logits.topk(1)[1][:,0]==y)
+        self.running_loss += loss.item()
+
 
 # class Trainer:
 #     def __init__(self, model, train_loader, lip_reg_max,loss = F.mse_loss , lamda=0.1, percent_of_lamda=0.1, min_accuracy=None, lr=0.1, adversarial_name="SGD", num_iters=1, epsilon=1e-2, backtracking=None, in_norm=None, out_norm=None, CLIP_estimation = "sum", iter_warm_up=None, lamda_stuck = None, change_lamda_in = True):
